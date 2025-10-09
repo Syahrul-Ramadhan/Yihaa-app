@@ -21,3 +21,4 @@ require __DIR__.'/auth.php';
 
 
 Route::prefix('home')->name('home.')->group(base_path('routes/home.php'));
+Route::prefix('admin')->name('admin.')->group(base_path('routes/admin.php'));
