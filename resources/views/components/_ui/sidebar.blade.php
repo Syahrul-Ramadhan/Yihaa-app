@@ -6,8 +6,8 @@
         <!-- Logo -->
         <div class="p-4 flex items-center justify-between">
             <button @click="open = !open" class="text-gray-400 hover:text-white cursor-pointer">
-                <div class="flex items-center space-x-2">
-                    <img src="{{ asset('images/logo.png') }}" class="w-8 h-8">
+                <div class="flex items-center space-x-4">
+                    <img src="{{ Vite::asset('resources/images/logo2.png') }}" class="w-8 h-8">
                     <span x-show="open" class="font-semibold text-xl">Yihaa</span>
                 </div>
             </button>
