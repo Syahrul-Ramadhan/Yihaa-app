@@ -22,8 +22,4 @@ require __DIR__.'/auth.php';
 
 Route::prefix('home')->name('home.')->group(base_path('routes/home.php'));
 Route::prefix('admin')->name('admin.')->group(base_path('routes/admin.php'));
-
-// Event pages
-Route::view('/events/seminar', 'pages.events.seminar')->name('events.seminar');
-Route::view('/events/beasiswa', 'pages.events.beasiswa')->name('events.beasiswa');
-Route::view('/events/lomba', 'pages.events.lomba')->name('events.lomba');
+Route::prefix('events')->name('events.')->group(base_path('routes/event.php'));
