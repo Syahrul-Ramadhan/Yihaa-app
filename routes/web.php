@@ -23,3 +23,5 @@ require __DIR__.'/auth.php';
 Route::prefix('home')->name('home.')->group(base_path('routes/home.php'));
 Route::prefix('admin')->name('admin.')->group(base_path('routes/admin.php'));
 Route::prefix('events')->name('events.')->group(base_path('routes/event.php'));
+Route::prefix('materi')->name('materi.')->group(base_path('routes/materi.php'));
+Route::prefix('notifikasi')->name('notifikasi.')->group(base_path('routes/notifikasi.php'));

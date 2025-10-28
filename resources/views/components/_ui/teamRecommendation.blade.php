@@ -13,7 +13,7 @@
     ];
 @endphp
 
-<div class="rounded-2xl p-6" style="background-color:#0E2F3E; box-shadow:0 4px 10px rgba(0, 224, 255, 0.15); color:#FFFFFF;">
+<div class="rounded-2xl p-6" style="bg-gradient-to-r from-[#122E32] to-[#0B1A1C]; box-shadow:0 4px 10px rgba(0, 224, 255, 0.15); color:#FFFFFF;">
     <h3 class="text-lg font-semibold mb-4" style="color:#00E0FF;">Team Recommendations</h3>
     <ol class="space-y-2">
         @foreach ($teams as $idx => $team)
