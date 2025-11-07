@@ -1,14 +1,14 @@
     <div 
-        x-data="{ open: true }"
-        class="h-screen flex flex-col justify-between transition-all duration-300 border-r-1 border-gray-600"
+        
+        class="fixed h-screen flex flex-col justify-between transition-all duration-300 border-r-1 border-gray-600 scroll-auto"
         :class="open ? 'w-64' : 'w-20'"
     >
         <!-- Logo -->
-        <div class="p-4 flex items-center justify-between">
+        <div class="mt-3 p-4 flex items-center">
             <button @click="open = !open" class="text-gray-400 hover:text-white cursor-pointer">
-                <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2 px-2">
                     <img src="{{ Vite::asset('resources/images/logo2.png') }}" class="w-8 h-8">
-                    <span x-show="open" class="font-semibold text-xl">Yihaa</span>
+                    <span x-show="open" class="font-bold text-xl">YIHAA</span>
                 </div>
             </button>
         </div>
@@ -36,14 +36,9 @@
             <span x-show="open">Materi</span>
             </a>
 
-            <a href="#" class="flex items-center space-x-3 hover:bg-neutral-900 px-3 py-2 rounded-full">
+            <a href="teams" class="flex items-center space-x-3 hover:bg-neutral-900 px-3 py-2 rounded-full">
             <i class="hgi hgi-stroke hgi-user-group text-2xl"></i>
-            <span x-show="open">Team Collaboration</span>
-            </a>
-
-            <a href="#" class="flex items-center space-x-3 hover:bg-neutral-900 px-3 py-2 rounded-full">
-            <i class="hgi hgi-stroke hgi-ai-chat-02 text-2xl"></i>
-            <span x-show="open">Mang AI</span>
+            <span x-show="open">Team Collab</span>
             </a>
 
             <!-- "More" button with a small popup. We use Alpine.js for simple interactivity.
@@ -63,7 +58,7 @@
                      style="display:none">
                     <!-- Each link is an icon + small label. Update href to the correct routes. -->
                     <!-- Messages link with inline SVG icon -->
-                    <a href="/messages" class="flex items-center gap-3 px-3 py-2 hover:bg-neutral-900 rounded">
+                    <a href="chat" class="flex items-center gap-3 px-3 py-2 hover:bg-neutral-900 rounded">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                         </svg>
@@ -91,11 +86,23 @@
         </nav>
 
         <!-- User -->
-        <div class="p-4 flex items-center space-x-3 border-t border-gray-700">
-            <img src="{{ asset('images/avatar.jpg') }}" class="w-10 h-10 rounded-full">
-            <div x-show="open">
-                <p class="font-semibold">John Anjay</p>
-                <p class="text-sm text-gray-400">Student</p>
+        <div class="relative" x-data="{ logoutOpen: false }">
+            <div class="p-4 flex items-center space-x-3 border-t border-gray-700 cursor-pointer hover:bg-neutral-900 transition-all duration-200" @click="logoutOpen = !logoutOpen">
+                <img src="https://qdfotopajdiuailyeprh.supabase.co/storage/v1/object/public/avatars/default-user.jpg" class="w-10 h-10 rounded-full">
+                <div x-show="open">
+                    <p class="font-semibold">John doe</p>
+                </div>
+            </div>
+
+            <div class="relative"  x-show="logoutOpen">
+                <div x-show="logoutOpen" @click.outside="logoutOpen = false" x-cloak
+                    class="absolute bottom-16 left-6 w-44 bg-[#052425] border border-gray-700 rounded-lg shadow-lg p-2 space-y-2 z-50"
+                    style="display:none">
+                    <a href="login" class="flex items-center gap-3 px-3 py-2 hover:bg-neutral-900 rounded">
+                        <i class="hgi hgi-stroke hgi-logout-square-01"></i>
+                        <span class="text-sm">Logout</span>
+                    </a>
+                </div>
             </div>
         </div>
     </div>
