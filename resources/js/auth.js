@@ -24,7 +24,7 @@ export async function signUpWithEmail(email, password, name) {
     password,
     options: {
       data: { name },
-      emailRedirectTo: `${window.location.origin}/reset-password`
+      emailRedirectTo: `${window.location.origin}/`
     }
   });
 }

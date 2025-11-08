@@ -27,7 +27,7 @@
             </div>
 
             <div class="mt-6 text-center">
-                <p class="text-base text-gray-800">Don't have an account? <a href="#" class="font-bold text-base text-[#27D5E8] underline hover:text-[#198b97]">Sign up</a></p>
+                <p class="text-base text-gray-800">Don't have an account? <a href="/register" class="font-bold text-base text-[#27D5E8] underline hover:text-[#198b97]">Sign up</a></p>
             </div>
         </div>
     </div>
