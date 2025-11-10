@@ -8,24 +8,26 @@
 
             <!-- Form Login -->
             <div class="flex items-center justify-center ">
-                <form action="#" method="POST" class="space-y-6 mt-3 w-full max-w-sm">
+                <form id="yihaa-login-form" method="POST" class="space-y-6 mt-3 w-full max-w-sm">
+                    @csrf
                     <div class="max-w-sm space-y-6">
                         <x-_ui.emailInput/>
                         <x-_ui.passwordInput/>
                     </div>
         
-                    <div class="flex justify-end">
-                            <a href="#" class="text-base text-[#27D5E8] underline hover:text-[#198b97]">Forgot password?</a>
+                    <div class="flex justify-between items-center">
+                        <a href="/register" class="text-base text-[#27D5E8] underline hover:text-[#198b97]">Sign up</a>
+                        <a href="/forgot-password" class="text-base text-[#27D5E8] underline hover:text-[#198b97]">Forgot password?</a>
                     </div>
         
-                    <button type="button" class="w-full py-3 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-[#0D1517] text-white hover:bg-[#182427] focus:outline-hidden focus:bg-red-800 cursor-pointer disabled:opacity-50 disabled:pointer-events-none">
+                    <button type="button" id="sign-in-btn" class="w-full py-3 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-[#0D1517] text-white hover:bg-[#182427] focus:outline-hidden focus:bg-red-800 cursor-pointer disabled:opacity-50 disabled:pointer-events-none">
                     Sign In
                     </button>
                 </form>
             </div>
 
             <div class="mt-6 text-center">
-                <p class="text-base text-gray-800">Don't have an account? <a href="#" class="font-bold text-base text-[#27D5E8] underline hover:text-[#198b97]">Sign up</a></p>
+                <p class="text-base text-gray-800">Don't have an account? <a href="/register" class="font-bold text-base text-[#27D5E8] underline hover:text-[#198b97]">Sign up</a></p>
             </div>
         </div>
     </div>
