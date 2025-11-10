@@ -5,10 +5,12 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\DashboardController;
 
 /**
- * View Routing for Home
+ * Admin routes - protected by 'auth' and 'admin' middleware
  */
-Route::get('/', [DashboardController::class, 'viewDashboard'])->name('dashboard');
-
-/**
- * Action Routing for Home
- */
+Route::middleware(['auth', 'admin'])->group(function () {
+    Route::get('/', [DashboardController::class, 'viewDashboard'])->name('dashboard');
+    
+    /**
+     * Action Routing for Admin
+     */
+});

@@ -10,6 +10,7 @@ Route::view('/', 'pages.users.login')->name('login');
 Route::view('/register', 'pages.users.register')->name('register');
 Route::view('/forgot-password', 'pages.users.forgot-password')->name('password.request');
 Route::view('/reset-password', 'pages.users.reset-password')->name('password.reset');
+Route::view('/admin-login', 'pages.users.admin-login')->name('admin.login');
 
 Route::view('/dashboard', 'dashboard')->name('dashboard');
 

@@ -63,5 +63,6 @@ class Kernel extends HttpKernel
 
         // custom
         'supabase' => \App\Http\Middleware\SupabaseAuthenticate::class,
+        'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
     ];
 }
