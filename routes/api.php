@@ -20,6 +20,10 @@ Route::middleware('supabase')->group(function () {
             'supabase_id' => $u->supabase_id,
             'email' => $u->email,
             'name' => $u->name,
+            'role' => $u->role,
+            'avatar_url' => $u->avatar_url,
+            'is_admin' => $u->isAdmin(),
+            'created_at' => $u->created_at,
         ];
     });
 });

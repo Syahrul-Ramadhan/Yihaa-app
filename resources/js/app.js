@@ -13,6 +13,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const emailInput = el('hs-floating-input-email');
   const passwordInput = el('hs-floating-input-passowrd-value'); // maintain existing id typo
   const signInBtn = el('sign-in-btn');
+  const adminSignInBtn = el('admin-sign-in-btn');
   const registerBtn = el('register-btn');
   const forgotBtn = el('forgot-btn');
   const resetBtn = el('reset-btn');
@@ -45,6 +46,45 @@ window.addEventListener('DOMContentLoaded', () => {
 
       signInBtn.textContent = 'Success! Redirecting...';
       setTimeout(() => { window.location.href = '/home'; }, 800);
+    });
+  }
+
+  // Admin login handler
+  if (emailInput && passwordInput && adminSignInBtn) {
+    adminSignInBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      
+      if (!email || !password) {
+        alert('Please enter email and password');
+        return;
+      }
+
+      adminSignInBtn.textContent = 'Signing in...';
+      adminSignInBtn.disabled = true;
+
+      const { data, error } = await signInWithEmail(email, password);
+      
+      if (error) {
+        alert('Login error: ' + error.message);
+        adminSignInBtn.textContent = 'Login as Admin';
+        adminSignInBtn.disabled = false;
+        return;
+      }
+
+      // Check if user is admin via API
+      const profile = await loadProfile();
+      if (!profile || !profile.is_admin) {
+        alert('Access denied. Admin privileges required.');
+        await signOut();
+        adminSignInBtn.textContent = 'Login as Admin';
+        adminSignInBtn.disabled = false;
+        return;
+      }
+
+      adminSignInBtn.textContent = 'Success! Redirecting...';
+      setTimeout(() => { window.location.href = '/admin'; }, 800);
     });
   }
 
