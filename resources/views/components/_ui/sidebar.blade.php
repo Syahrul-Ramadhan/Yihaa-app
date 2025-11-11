@@ -98,7 +98,7 @@
                 <div x-show="logoutOpen" @click.outside="logoutOpen = false" x-cloak
                     class="absolute bottom-16 left-6 w-44 bg-[#052425] border border-gray-700 rounded-lg shadow-lg p-2 space-y-2 z-50"
                     style="display:none">
-                    <a href="login" class="flex items-center gap-3 px-3 py-2 hover:bg-neutral-900 rounded">
+                    <a href="/" class="flex items-center gap-3 px-3 py-2 hover:bg-neutral-900 rounded">
                         <i class="hgi hgi-stroke hgi-logout-square-01"></i>
                         <span class="text-sm">Logout</span>
                     </a>

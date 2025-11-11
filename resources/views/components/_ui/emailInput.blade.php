@@ -1,6 +1,6 @@
 <!-- Floating Input -->
   <div class="relative">
-    <input type="email" id="hs-floating-input-email" class="peer p-4 block w-full border border-gray-300 rounded-lg sm:text-sm placeholder:text-transparent focus:border-[#27D5E8] focus:ring-[#27D5E8] disabled:opacity-50 disabled:pointer-events-none
+    <input type="email" id="hs-floating-input-email email" name="email" class="peer p-4 block w-full border border-gray-300 rounded-lg sm:text-sm placeholder:text-transparent focus:border-[#27D5E8] focus:ring-[#27D5E8] disabled:opacity-50 disabled:pointer-events-none
     focus:pt-6
     focus:pb-2
     not-placeholder-shown:pt-6

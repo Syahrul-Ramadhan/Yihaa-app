@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\MateriController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TeamChatController;
+use App\Http\Controllers\AuthController;
 
 // Route utama menggunakan view login yang sudah jadi
 Route::view('/', 'pages.users.login')->name('login');
@@ -28,6 +30,7 @@ Route::prefix('notifikasi')->name('notifikasi.')->group(base_path('routes/notifi
 
 // Contoh dan halaman lain
 Route::get('/home', [PostController::class, 'index'])->name('posts.index');
+Route::get('/materi', [MateriController::class, 'index'])->name('materi.index');
 Route::get('/test-insert', [PostController::class, 'testInsert']);
 Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
 Route::get('/chat', [TeamChatController::class, 'index'])->name('chat.index');
@@ -36,3 +39,9 @@ Route::get('/chat/{team_id}', [TeamChatController::class, 'show'])->name('chat.s
 // Hapus/komentar baris auth bawaan Laravel (session) kalau tidak dipakai:
 // require __DIR__.'/auth.php';
 
+// Auth Logic
+Route::post('/register', [AuthController::class, 'register'])->name('register');
+
+Route::get('/login', [AuthController::class, 'viewLogin'])->name('login');
+Route::post('/login', [AuthController::class, 'login'])->name('login.process');
+Route::get('/logout', [AuthController::class, 'logout'])->name('logout');

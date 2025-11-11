@@ -54,20 +54,40 @@
 
         {{-- Daftar Materi --}}
         <div id="materiList" class="space-y-6">
-            {{-- Card contoh bawaan --}}
-            <div class="bg-gradient-to-r from-[#122E32] to-[#0B1A1C] p-6 rounded-2xl shadow-md text-white">
-                <div class="flex items-center space-x-3 mb-4">
-                    <div class="w-10 h-10 rounded-full bg-gray-500"></div>
-                    <div>
-                        <h3 class="font-semibold text-base">Kew Coder</h3>
+            @foreach ($materials as $item)
+                <div class="bg-gradient-to-r from-[#122E32] to-[#0B1A1C] p-6 rounded-2xl shadow-md text-white">
+                    <div class="flex items-center space-x-3 mb-4">
+                        @if (!empty($item['user']['avatar_url']))
+                            <img src="{{ $item['user']['avatar_url'] }}" alt="Avatar" class="w-10 h-10 rounded-full">
+                        @else
+                            <div class="w-10 h-10 rounded-full bg-gray-500"></div>
+                        @endif
+                        <div>
+                            <h3 class="font-semibold text-base">{{ $item['user']['name'] ?? 'Anonim' }}</h3>
+                        </div>
                     </div>
+
+                    <h2 class="text-lg font-semibold mb-3">{{ $item['tittle'] }}</h2>
+
+                    @if (!empty($item['thumbnail_url']))
+                        <img src="{{ $item['thumbnail_url'] }}" alt="Materi Image" class="w-full rounded-lg mb-3">
+                    @endif
+
+                    <p class="text-gray-300 text-sm">{{ $item['description'] }}</p>
+
+                    @if (!empty($item['file_url']))
+                        <a href="{{ $item['file_url'] }}" target="_blank" class="text-teal-400 text-sm mt-2 inline-block hover:underline">
+                            READ MORE
+                        </a>
+                    @endif
                 </div>
-                <h2 class="text-lg font-semibold mb-3">Aljabar Linier</h2>
-                <img src="{{ asset('resources/images/materi.jpg') }}" alt="Materi Image" class="w-full rounded-lg mb-3">
-                <p class="text-gray-300 text-sm">Kali ini aku mau share ke temen-temen sekalian materi aljabar linier ya guys, ini yang mengulang-ulang materi kuliah keren ini </p>
-                <a href="#" class="text-teal-400 text-sm mt-2 inline-block hover:underline">READ MORE</a>
-            </div>
+            @endforeach
+
+            @if ($materials->isEmpty())
+                <p class="text-gray-400 text-center">Belum ada materi tersedia.</p>
+            @endif
         </div>
+
     </div>
 
     {{-- Bagian Kanan: Komponen Search & Team Recommendation --}}
