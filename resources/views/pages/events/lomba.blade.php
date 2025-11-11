@@ -1,6 +1,9 @@
 @extends('components._layouts.home')
 
 @section('content')
+@php
+    use Carbon\Carbon;
+@endphp
     <div class="max-w-7xl mx-auto grid grid-cols-12 gap-6">
         <div class="col-span-12 md:col-span-8 space-y-6">
             @include('components._ui.tabs', ['active' => 'lomba'])
@@ -11,9 +14,9 @@
                     'title' => $lomba['nama_lomba'] ?? 'Lomba',
                     'image' => Vite::asset('resources/images/Poster-Lomba.jpeg'),
                     'details' => [
-                        ['label' => 'Tanggal', 'value' => $lomba['tanggal_pelaksanaan'] ?? '-'],
-                        ['label' => 'Mulai', 'value' => $lomba['mulai_pendaftaran'] ?? '-'],
-                        ['label' => 'Akhir', 'value' => $lomba['akhir_pendaftaran'] ?? '-'],
+                        ['label' => 'Tanggal', 'value' => isset($lomba['tanggal_pelaksanaan']) && $lomba['tanggal_pelaksanaan'] ? Carbon::parse($lomba['tanggal_pelaksanaan'])->locale('id')->translatedFormat('j F Y') : '-'],
+                        ['label' => 'Mulai', 'value' => isset($lomba['mulai_pendaftaran']) && $lomba['mulai_pendaftaran'] ? Carbon::parse($lomba['mulai_pendaftaran'])->locale('id')->translatedFormat('j F Y') : '-'],
+                        ['label' => 'Akhir', 'value' => isset($lomba['akhir_pendaftaran']) && $lomba['akhir_pendaftaran'] ? Carbon::parse($lomba['akhir_pendaftaran'])->locale('id')->translatedFormat('j F Y') : '-'],
                         ['label' => 'Lokasi', 'value' => $lomba['lokasi'] ?? '-'],
                         ['label' => 'Jenis', 'value' => $lomba['jenis_lomba'] ?? '-'],
                         ['label' => 'Jenjang', 'value' => $lomba['jenjang_lomba'] ?? '-'],
