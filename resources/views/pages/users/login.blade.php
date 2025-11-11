@@ -15,8 +15,7 @@
                         <x-_ui.passwordInput/>
                     </div>
         
-                    <div class="flex justify-between items-center">
-                        <a href="/register" class="text-base text-[#27D5E8] underline hover:text-[#198b97]">Sign up</a>
+                    <div class="flex justify-end items-center">
                         <a href="/forgot-password" class="text-base text-[#27D5E8] underline hover:text-[#198b97]">Forgot password?</a>
                     </div>
         
