@@ -1,4 +1,6 @@
 @php
+    use Illuminate\Support\Str;
+
     $image = $image ?? Vite::asset('resources/images/logo.png');
     $title = $title ?? 'Event Title';
     $details = $details ?? [
@@ -24,8 +26,27 @@
 
         <div class="grid grid-cols-12 gap-y-2 text-sm">
             @foreach ($details as $row)
-                <div class="col-span-3 text-white">{{ $row['label'] }}</div>
-                <div class="col-span-9 text-[#B0C7CC]">: {{ $row['value'] }}</div>
+                @php
+                    $label = $row['label'] ?? '';
+                    $value = (string) ($row['value'] ?? '');
+                @endphp
+
+                <div class="col-span-3 text-white">{{ $label }}</div>
+
+                {{-- If the value is long (over 100 chars) we show a truncated preview and a Read more toggle.
+                     We use Alpine.js per-row so each toggle is independent and beginner-friendly. --}}
+                @if(Str::length($value) > 100)
+                    <div class="col-span-9 text-[#B0C7CC]" x-data="{ open: false }">
+                        :
+                        <span x-show="!open">{{ Str::limit($value, 100) }}</span>
+                        <span x-show="open" x-cloak>{{ $value }}</span>
+                        <button @click="open = !open" class="ml-2 text-sm text-[#00E0FF]">
+                            <span x-text="open ? 'Read less' : 'Read more'"></span>
+                        </button>
+                    </div>
+                @else
+                    <div class="col-span-9 text-[#B0C7CC]">: {{ $value }}</div>
+                @endif
             @endforeach
         </div>
 
