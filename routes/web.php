@@ -30,6 +30,7 @@ Route::prefix('notifikasi')->name('notifikasi.')->group(base_path('routes/notifi
 
 // Contoh dan halaman lain
 Route::get('/home', [PostController::class, 'index'])->name('posts.index');
+Route::post('/post/store', [PostController::class, 'store'])->name('posts.store');
 Route::get('/materi', [MateriController::class, 'index'])->name('materi.index');
 Route::get('/test-insert', [PostController::class, 'testInsert']);
 Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');

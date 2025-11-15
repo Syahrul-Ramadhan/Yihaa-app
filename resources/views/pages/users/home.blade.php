@@ -14,6 +14,45 @@
                 </div>
             </div>
 
+            {{-- Di file: resources/views/pages/users/home.blade.php --}}
+
+            @if ($errors->any())
+                <div x-data="{ show: true }" x-show="show" x-transition
+                    class="flex items-center justify-between p-4 mb-4 rounded-lg" 
+                    style="background-color: #4b1111; color: white;">
+                    
+                    <div>
+                        <strong>Oops! Ada masalah:</strong>
+                        <ul class="list-disc list-inside">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    <button @click="show = false" class="text-white text-2xl ml-4">&times;</button>
+                </div>
+            @endif
+
+            @if (session('error'))
+                <div x-data="{ show: true }" x-show="show" x-transition
+                    class="flex items-center justify-between p-4 mb-4 rounded-lg" 
+                    style="background-color: #4b1111; color: white;">
+                    
+                    <span>{{ session('error') }}</span>
+                    <button @click="show = false" class="text-white text-2xl ml-4">&times;</button>
+                </div>
+            @endif
+
+            @if (session('success'))
+                <div x-data="{ show: true }" x-show="show" x-transition
+                    class="flex items-center justify-between p-4 mb-4 rounded-lg" 
+                    style="background-color: #114b11; color: white;">
+                    
+                    <span>{{ session('success') }}</span>
+                    <button @click="show = false" class="text-white text-2xl ml-4">&times;</button>
+                </div>
+            @endif
+
             <!-- Post Input Component -->
             <x-_ui.post-input />
 
