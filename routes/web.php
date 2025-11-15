@@ -6,6 +6,7 @@ use App\Http\Controllers\PostController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TeamChatController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\EventController;
 
 // Route utama menggunakan view login yang sudah jadi
 Route::view('/', 'pages.users.login')->name('login');
@@ -24,7 +25,6 @@ Route::view('/dashboard', 'dashboard')->name('dashboard');
 Route::prefix('home')->name('home.')->group(base_path('routes/home.php'));
 // Route::prefix('teams')->name('teams.')->group(base_path('routes/team.php'));
 Route::prefix('admin')->name('admin.')->group(base_path('routes/admin.php'));
-Route::prefix('events')->name('events.')->group(base_path('routes/event.php'));
 Route::prefix('materi')->name('materi.')->group(base_path('routes/materi.php'));
 Route::prefix('notifikasi')->name('notifikasi.')->group(base_path('routes/notifikasi.php'));
 
@@ -45,3 +45,8 @@ Route::post('/register', [AuthController::class, 'register'])->name('register');
 Route::get('/login', [AuthController::class, 'viewLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.process');
 Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
+
+// event
+Route::get('/seminar', [EventController::class, 'viewSeminar'])->name('seminar');
+Route::get('/beasiswa', [EventController::class, 'viewBeasiswa'])->name('beasiswa');
+Route::get('/lomba', [EventController::class, 'viewLomba'])->name('lomba');

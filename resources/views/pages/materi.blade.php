@@ -58,7 +58,7 @@
                 <div class="bg-gradient-to-r from-[#122E32] to-[#0B1A1C] p-6 rounded-2xl shadow-md text-white">
                     <div class="flex items-center space-x-3 mb-4">
                         @if (!empty($item['user']['avatar_url']))
-                            <img src="{{ $item['user']['avatar_url'] }}" alt="Avatar" class="w-10 h-10 rounded-full">
+                            <img src="{{ $item['user']['avatar_url'] }}" alt="Avatar" class="w-10 h-10 rounded-full object-cover">
                         @else
                             <div class="w-10 h-10 rounded-full bg-gray-500"></div>
                         @endif
