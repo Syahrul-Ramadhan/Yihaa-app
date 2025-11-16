@@ -1,8 +1,9 @@
 <?php
+
 namespace App\Http\Controllers;
+
 use App\Helpers\SupabaseHelper;
 use App\Models\Post;
-
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,26 +15,19 @@ class PostController extends Controller
         // 1. Tangkap input pencarian
         $search = $request->input('search');
 
-        $filter = null; // Default: tidak ada filter
+        $filter = null;
         if ($search) {
             $filter = [
-                'caption' => [
-                    'ilike' => '%' . $search . '%'
-                ]
+                'caption' => ['ilike' => "%{$search}%"]
             ];
         }
 
-        // 2. Query GraphQL - PERBAIKAN FINAL (KEMBALI KE postsCollection)
+        // 2. Query GraphQL
         $query = <<<'GRAPHQL'
         query($filter: postsFilter) {
-            
-            # ▼▼▼ UBAH KEMBALI KE 'postsCollection' ▼▼▼
             postsCollection(
-                filter: $filter, 
-                
-                # ▼ SINTAKS 'orderBy' YANG BENAR ▼
+                filter: $filter
                 orderBy: [{ created_at: DescNullsLast }]
-            
             ) {
                 edges {
                     node {
@@ -42,8 +36,6 @@ class PostController extends Controller
                         image_url
                         created_at
                         uploaded_by
-                        
-                        # --- RELASI DIAKTIFKAN ---
                         users {
                             name
                             avatar_url
@@ -62,37 +54,54 @@ class PostController extends Controller
                                 }
                             }
                         }
-                        # --- BATAS RELASI ---
                     }
                 }
             }
         }
         GRAPHQL;
 
+        // 3. Execute GraphQL dengan ANON_KEY (untuk read)
         $response = Http::withHeaders([
-            'apikey' => env('SUPABASE_SERVICE_KEY'),
-            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'apikey' => env('SUPABASE_ANON_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
             'Content-Type' => 'application/json',
         ])->post(env('SUPABASE_URL') . '/graphql/v1', [
             'query' => $query,
-            'variables' => [
-                'filter' => $filter
-            ]
+            'variables' => ['filter' => $filter]
         ]);
 
+        // 4. Handle errors
         if ($response->failed()) {
-            dd('Error HTTP Gagal: ' . (string) $response->body());
+            \Log::error('PostController GraphQL Error', [
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+            
+            return view('pages.users.home', [
+                'posts' => [],
+                'isLoggedIn' => session('supabase_token') !== null,
+                'error' => 'Failed to load posts'
+            ]);
         }
-        
-        // ▼▼▼ BIARKAN INI TETAP ADA SAMPAI BERHASIL ▼▼▼
-        if ($response->json('errors')) {
-             dd('Error payload GraphQL: ', $response->json('errors'));
-        }
-        
-        // Ambil node data
-        $edges = $response->json('data.postsCollection.edges') ?? [];
 
-        // Ubah ke bentuk array Laravel-friendly
+        $data = $response->json();
+        
+        // Check GraphQL errors
+        if (isset($data['errors'])) {
+            \Log::error('PostController GraphQL Payload Error', [
+                'errors' => $data['errors']
+            ]);
+            
+            return view('pages.users.home', [
+                'posts' => [],
+                'isLoggedIn' => session('supabase_token') !== null,
+                'error' => 'GraphQL error: ' . ($data['errors'][0]['message'] ?? 'Unknown error')
+            ]);
+        }
+
+        // 5. Extract and transform posts
+        $edges = $data['data']['postsCollection']['edges'] ?? [];
+        
         $posts = collect($edges)->map(function ($edge) {
             $node = $edge['node'];
             return [
@@ -106,66 +115,151 @@ class PostController extends Controller
             ];
         });
 
-        return view('pages.users.home', compact('posts'));
+        // 6. Check if user logged in
+        $isLoggedIn = session('supabase_token') !== null;
+
+        return view('pages.users.home', [
+            'posts' => $posts,
+            'isLoggedIn' => $isLoggedIn
+        ]);
     }
 
     public function store(Request $request)
     {
-        // 1. Validasi input dari form
+        // 1. Check if user logged in
+        $supabaseToken = session('supabase_token');
+        if (!$supabaseToken) {
+            return redirect()->route('login')->with('error', 'Please login to create post');
+        }
+
+        // 2. Validate input
         $request->validate([
             'caption' => 'required|string|max:2000',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
-        $imageUrl = null;
+        // 3. Get current user ID
+        $userResponse = Http::withHeaders([
+            'apikey' => env('SUPABASE_ANON_KEY'),
+            'Authorization' => 'Bearer ' . $supabaseToken,
+        ])->get(env('SUPABASE_URL') . '/auth/v1/user');
 
-        // 2. Proses upload gambar (jika ada)
+        if ($userResponse->failed()) {
+            return back()->with('error', 'Failed to verify user');
+        }
+
+        $user = $userResponse->json();
+        $userId = $user['id'];
+
+        // 4. Upload image if exists
+        $imageUrl = null;
         if ($request->hasFile('image')) {
             $file = $request->file('image');
-            
-            $bucketName = 'post-images'; // Ini sudah benar
-            
-            // ▼ PERUBAHAN 1: Hapus $bucketName . '/' dari sini
+            $bucketName = 'post-images';
             $fileName = time() . '_' . $file->getClientOriginalName();
-            
-           // Upload ke Supabase Storage
+
+            // Upload to Supabase Storage
             $storageResponse = Http::withHeaders([
-                'apikey' => env('SUPABASE_SERVICE_KEY'),
-                'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
-            ])
-            ->withBody(
-                $file->getContent(), 
+                'apikey' => env('SUPABASE_SERVICE_ROLE_KEY'),
+                'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_ROLE_KEY'),
+            ])->withBody(
+                $file->getContent(),
                 $file->getMimeType()
-            )
-            // ▼ PERUBAHAN 2: Ubah URL post. Hapus '/public/' dan masukkan $bucketName
-            ->post(env('SUPABASE_URL') . '/storage/v1/object/' . $bucketName . '/' . $fileName);
+            )->post(env('SUPABASE_URL') . '/storage/v1/object/' . $bucketName . '/' . $fileName);
 
             if ($storageResponse->failed()) {
-                // Tampilkan pesan error yang lebih jelas untuk debugging
-                // dd($storageResponse->json()); 
-                return back()->with('error', 'Gagal mengupload gambar. (Storage API Error)');
+                \Log::error('Image Upload Error', [
+                    'status' => $storageResponse->status(),
+                    'body' => $storageResponse->body()
+                ]);
+                
+                return back()->with('error', 'Failed to upload image');
             }
-            
-            // ▼ PERUBAHAN 3: Tambahkan $bucketName di URL publik
+
             $imageUrl = env('SUPABASE_URL') . '/storage/v1/object/public/' . $bucketName . '/' . $fileName;
         }
 
-        // 4. Simpan data ke database (menggunakan Model)
-        $post = new \App\Models\Post();
-        
-        $post->caption = $request->input('caption'); // Ambil dari form
-        $post->image_url = $imageUrl; // Hasil upload (bisa null)
-        
-        // Ganti '1' dengan ID user yang sedang login
-        // Jika sistem login Anda sudah jalan, gunakan Auth::id()
-        $post->uploaded_by = 1;
-        // $post->uploaded_by = Auth::id(); // GUNAKAN INI JIKA SUDAH LOGIN
-        
-        $post->created_at = now();
+        // 5. Insert post via GraphQL
+        $mutation = <<<'GRAPHQL'
+        mutation InsertPost($caption: String!, $image_url: String, $uploaded_by: UUID!) {
+            insertIntopostsCollection(objects: [{
+                caption: $caption
+                image_url: $image_url
+                uploaded_by: $uploaded_by
+            }]) {
+                records {
+                    post_id
+                    caption
+                    image_url
+                    created_at
+                }
+            }
+        }
+        GRAPHQL;
 
-        $post->save(); // Model akan mengirim ini ke Supabase
+        $response = Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_ROLE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_ROLE_KEY'),
+            'Content-Type' => 'application/json',
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $mutation,
+            'variables' => [
+                'caption' => $request->caption,
+                'image_url' => $imageUrl,
+                'uploaded_by' => $userId
+            ]
+        ]);
 
-        // 5. Kembalikan ke halaman home
-        return redirect()->route('posts.index')->with('success', 'Postingan berhasil ditambahkan!');
+        if ($response->failed()) {
+            \Log::error('Post Creation Error', [
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+            
+            return back()->with('error', 'Failed to create post');
+        }
+
+        $data = $response->json();
+        
+        if (isset($data['errors'])) {
+            \Log::error('Post Creation GraphQL Error', [
+                'errors' => $data['errors']
+            ]);
+            
+            return back()->with('error', 'Failed to create post: ' . ($data['errors'][0]['message'] ?? 'Unknown error'));
+        }
+
+        return redirect()->route('home')->with('success', 'Post created successfully!');
+    }
+
+    public function testInsert()
+    {
+        // Test function untuk verify GraphQL connection
+        $mutation = <<<'GRAPHQL'
+        mutation {
+            insertIntopostsCollection(objects: [{
+                caption: "Test post from controller"
+                uploaded_by: "00000000-0000-0000-0000-000000000000"
+            }]) {
+                records {
+                    post_id
+                    caption
+                }
+            }
+        }
+        GRAPHQL;
+
+        $response = Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_ROLE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_ROLE_KEY'),
+            'Content-Type' => 'application/json',
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $mutation
+        ]);
+
+        return response()->json([
+            'status' => $response->status(),
+            'data' => $response->json()
+        ]);
     }
 }
