@@ -9,12 +9,32 @@ use Illuminate\Support\Facades\Auth;
 
 class PostController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // Query GraphQL untuk ambil data teams
+        // 1. Tangkap input pencarian
+        $search = $request->input('search');
+
+        $filter = null; // Default: tidak ada filter
+        if ($search) {
+            $filter = [
+                'caption' => [
+                    'ilike' => '%' . $search . '%'
+                ]
+            ];
+        }
+
+        // 2. Query GraphQL - PERBAIKAN FINAL (KEMBALI KE postsCollection)
         $query = <<<'GRAPHQL'
-        query {
-            postsCollection {
+        query($filter: postsFilter) {
+            
+            # ▼▼▼ UBAH KEMBALI KE 'postsCollection' ▼▼▼
+            postsCollection(
+                filter: $filter, 
+                
+                # ▼ SINTAKS 'orderBy' YANG BENAR ▼
+                orderBy: [{ created_at: DescNullsLast }]
+            
+            ) {
                 edges {
                     node {
                         post_id
@@ -22,6 +42,8 @@ class PostController extends Controller
                         image_url
                         created_at
                         uploaded_by
+                        
+                        # --- RELASI DIAKTIFKAN ---
                         users {
                             name
                             avatar_url
@@ -30,7 +52,6 @@ class PostController extends Controller
                             edges {
                                 node {
                                     like_id
-                                    user_id
                                 }
                             }
                         }
@@ -38,11 +59,10 @@ class PostController extends Controller
                             edges {
                                 node {
                                     comment_id
-                                    user_id
-                                    content
                                 }
                             }
                         }
+                        # --- BATAS RELASI ---
                     }
                 }
             }
@@ -55,12 +75,19 @@ class PostController extends Controller
             'Content-Type' => 'application/json',
         ])->post(env('SUPABASE_URL') . '/graphql/v1', [
             'query' => $query,
+            'variables' => [
+                'filter' => $filter
+            ]
         ]);
 
         if ($response->failed()) {
-            dd('Error GraphQL: ' . $response->body());
+            dd('Error HTTP Gagal: ' . (string) $response->body());
         }
-
+        
+        // ▼▼▼ BIARKAN INI TETAP ADA SAMPAI BERHASIL ▼▼▼
+        if ($response->json('errors')) {
+             dd('Error payload GraphQL: ', $response->json('errors'));
+        }
         
         // Ambil node data
         $edges = $response->json('data.postsCollection.edges') ?? [];
@@ -73,7 +100,7 @@ class PostController extends Controller
                 'caption' => $node['caption'],
                 'image_url' => $node['image_url'],
                 'created_at' => $node['created_at'],
-                'user' => $node['users'],
+                'user' => $node['users'] ?? null,
                 'likes_count' => count($node['likesCollection']['edges'] ?? []),
                 'comments_count' => count($node['commentsCollection']['edges'] ?? []),
             ];
@@ -81,20 +108,6 @@ class PostController extends Controller
 
         return view('pages.users.home', compact('posts'));
     }
-
-    // public function testInsert()
-    // {
-    //     $post = new \App\Models\Post();
-
-    //     $post->caption = "Ini postingan percobaan untuk uji insert ke Supabase.";
-    //     $post->image_url = "https://via.placeholder.com/600x300.png?text=Contoh+Gambar";
-    //     $post->uploaded_by = 1;
-    //     $post->created_at = now();
-
-    //     $post->save();
-
-    //     return "✅ Data berhasil ditambahkan! ID baru: " . $post->post_id;
-    // }
 
     public function store(Request $request)
     {

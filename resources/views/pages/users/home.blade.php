@@ -7,14 +7,33 @@
         <!-- left side -->
         <div class="col-span-12 md:col-span-8 space-y-8">
             <!-- Search Bar -->
-            <div class="relative">
-                <input type="text" class="peer py-2.5 sm:py-3 px-4 ps-11 block w-full bg-gradient-to-l from-[#163F44] to-[#020C0D] border border-gray-600 rounded-lg sm:text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none" placeholder="Search">
+            <form class="relative" method="GET" action="{{ route('posts.index') }}">
+    
+                <input 
+                    type="text" 
+                    name="search"
+                    {{-- ▼ MODIFIKASI: Tambahkan 'pe-10' (padding-end) di sini ▼ --}}
+                    class="peer py-2.5 sm:py-3 px-4 ps-11 pe-10 block w-full bg-gradient-to-l from-[#163F44] to-[#020C0D] border border-gray-600 rounded-lg sm:text-sm focus:border-blue-500 focus:ring-blue-500 text-white" 
+                    placeholder="Cari postingan berdasarkan caption..."
+                    value="{{ request('search') }}"
+                >
                 <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-4 peer-disabled:opacity-50 peer-disabled:pointer-events-none">
                     <i class="hgi hgi-stroke hgi-search-01"></i>
                 </div>
-            </div>
 
-            {{-- Di file: resources/views/pages/users/home.blade.php --}}
+                {{-- ▼ TAMBAHAN BARU: Tombol 'X' untuk Reset Pencarian ▼ --}}
+                @if(request('search'))
+                    <a 
+                        href="{{ route('posts.index') }}" 
+                        title="Hapus pencarian"
+                        class="absolute inset-y-0 end-0 flex items-center pe-4 text-gray-400 hover:text-white"
+                        style="font-size: 1.5rem; line-height: 1; text-decoration: none;"
+                    >
+                        &times;
+                    </a>
+                @endif
+            
+            </form>
 
             @if ($errors->any())
                 <div x-data="{ show: true }" x-show="show" x-transition
