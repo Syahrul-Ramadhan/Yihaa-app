@@ -8,7 +8,7 @@
 
       <!-- Form Register -->
         <div class="flex items-center justify-center ">
-        <form id="yihaa-register-form" action="{{ route('register') }}" method="POST" class="space-y-6 mt-3 w-full max-w-sm">
+        <form id="yihaa-register-form" action="{{ route('register.form') }}" method="POST" class="space-y-6 mt-3 w-full max-w-sm">
           @csrf
             <div class="max-w-sm space-y-6">
             <div class="relative">

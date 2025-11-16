@@ -10,16 +10,16 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\NotifikasiController;
 
-// Route utama menggunakan view login yang sudah jadi
-Route::view('/', 'pages.users.login')->name('login');
-Route::view('/register', 'pages.users.register')->name('register');
 Route::view('/forgot-password', 'pages.users.forgot-password')->name('forgot');
 Route::view('/reset-password', 'pages.users.reset-password')->name('reset');
 
-// Auth Logic
-Route::post('/register', [AuthController::class, 'register'])->name('register');
+// register route
+Route::view('/register', 'pages.users.register')->name('register.form');
+Route::post('/register', [AuthController::class, 'register'])->name('register.process');
 
-Route::get('/login', [AuthController::class, 'viewLogin'])->name('login');
+// Login route
+// Route::get('/login', [AuthController::class, 'viewLogin'])->name('login');
+Route::view('/', 'pages.users.login')->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.process');
 Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
 
@@ -27,8 +27,9 @@ Route::prefix('admin')->name('admin.')->group(base_path('routes/admin.php'));
 Route::view('/admin-login', 'pages.users.admin-login')->name('admin.login');
 Route::view('/dashboard', 'dashboard')->name('dashboard');
 
-Route::middleware(['auth.check'])->group(function () {
+
     Route::get('/home', [PostController::class, 'index'])->name('posts.index');
+    Route::post('/post/store', [PostController::class, 'store'])->name('posts.store');
     Route::get('/test-insert', [PostController::class, 'testInsert']);
     // event
     Route::get('/seminar', [EventController::class, 'viewSeminar'])->name('seminar');
@@ -43,4 +44,4 @@ Route::middleware(['auth.check'])->group(function () {
     Route::get('/chat/{team_id}', [TeamChatController::class, 'show'])->name('chat.show');
     // profile
     Route::get('/profile', [AuthController::class, 'profile'])->name('profile');
-});
+
