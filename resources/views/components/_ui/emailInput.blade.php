@@ -7,6 +7,12 @@
     not-placeholder-shown:pb-2
     autofill:pt-6
     autofill:pb-2" placeholder="you@email.com">
+      @if ($errors->has('email'))
+        <span class="mt-1 text-sm text-red-500 block">
+            {{ $errors->first('email') }}
+        </span>
+      @endif
+
     <label for="hs-floating-input-email" class="absolute top-0 start-0 p-4 h-full sm:text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent origin-[0_0] peer-disabled:opacity-50 peer-disabled:pointer-events-none
       peer-focus:scale-90
       peer-focus:translate-x-0.5

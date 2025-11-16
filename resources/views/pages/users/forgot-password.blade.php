@@ -6,14 +6,45 @@
       <p class="font-bold text-2xl">Forgot your password?</p>
       <p class="text-sm text-gray-600">Enter your email and we'll send you a reset link.</p>
     </div>
-    <form id="yihaa-forgot-form" class="space-y-6 w-full max-w-sm">
+    <form  class="space-y-6 w-full max-w-sm ">
       @csrf
-      <div class="space-y-6">
+      <div class="space-y-6 mb-6">
         <x-_ui.emailInput/>
       </div>
-      <button type="button" id="forgot-btn" class="w-full py-3 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-[#0D1517] text-white hover:bg-[#182427] focus:outline-hidden cursor-pointer disabled:opacity-50">Send reset link</button>
+      <button type="submit" id="sendBtn" class="w-full py-3 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-[#0D1517] text-white hover:bg-[#182427] focus:outline-hidden cursor-pointer disabled:opacity-50">Send reset link</button>
       <p class="text-center text-sm text-gray-600 mt-4"><a href="/" class="text-[#27D5E8] underline">Back to login</a></p>
     </form>
   </div>
 </div>
+
+@if(session('success'))
+<script>
+    showModal("Berhasil!", "{{ session('success') }}");
+</script>
+@endif
+
+@if(session('error'))
+<script>
+    showModal("Gagal!", "{{ session('error') }}");
+</script>
+@endif
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js';
+
+const supabase = createClient("{{ env('SUPABASE_URL') }}", "{{ env('SUPABASE_ANON_KEY') }}");
+
+document.getElementById("sendBtn").addEventListener("click", async () => {
+    const email = document.getElementById("email").value;
+    if (!email) return alert("Email is required!");
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: "{{ url('/reset-password') }}"
+    });
+
+    if (error) return alert(error.message);
+    alert("Reset link sent! Please check your email.");
+});
+</script>
+
 @endsection

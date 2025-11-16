@@ -88,9 +88,9 @@
         <!-- User -->
         <div class="relative" x-data="{ logoutOpen: false }">
             <div class="p-4 flex items-center space-x-3 border-t border-gray-700 cursor-pointer hover:bg-neutral-900 transition-all duration-200" @click="logoutOpen = !logoutOpen">
-                <img src="https://qdfotopajdiuailyeprh.supabase.co/storage/v1/object/public/avatars/default-user.jpg" class="w-10 h-10 rounded-full">
+                <img src="{{  session('avatar_url') }}" class="w-10 h-10 rounded-full">
                 <div x-show="open">
-                    <p class="font-semibold">John doe</p>
+                    <p class="font-semibold">{{  session('user_name')}}</p>
                 </div>
             </div>
 
@@ -98,7 +98,7 @@
                 <div x-show="logoutOpen" @click.outside="logoutOpen = false" x-cloak
                     class="absolute bottom-16 left-6 w-44 bg-[#052425] border border-gray-700 rounded-lg shadow-lg p-2 space-y-2 z-50"
                     style="display:none">
-                    <a href="/" class="flex items-center gap-3 px-3 py-2 hover:bg-neutral-900 rounded">
+                    <a href="{{ route('logout') }}" class="flex items-center gap-3 px-3 py-2 hover:bg-neutral-900 rounded">
                         <i class="hgi hgi-stroke hgi-logout-square-01"></i>
                         <span class="text-sm">Logout</span>
                     </a>

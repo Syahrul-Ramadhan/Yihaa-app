@@ -19,17 +19,10 @@
                         <a href="/forgot-password" class="text-base text-[#27D5E8] underline hover:text-[#198b97]">Forgot password?</a>
                     </div>
         
-                    <button type="submit" id="sign-in-btn" class="w-full py-3 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-[#0D1517] text-white hover:bg-[#182427] focus:outline-hidden focus:bg-red-800 cursor-pointer disabled:opacity-50 disabled:pointer-events-none">
+                    <button type="submit" id="sign-in-btn" class="w-full py-3 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-[#0D1517] text-white hover:bg-[#182427] cursor-pointer">
                     Sign In
                     </button>
                 </form>
-
-                @if(session('error'))
-                <p style="color:red;">{{ session('error') }}</p>
-                @endif
-                @if(session('success'))
-                <p style="color:green;">{{ session('success') }}</p>
-                @endif
             </div>
 
             <div class="mt-6 text-center">
@@ -37,4 +30,57 @@
             </div>
         </div>
     </div>
+
+    @if(session('login_success'))
+    <div id="successModal"
+        class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 text-center w-72">
+            <h2 class="font-bold text-lg text-blue-600">Success!</h2>
+            <p class="text-gray-700 mt-2">{{ session('login_success') }}</p>
+
+            <div class="mt-5">
+                <button id="closeModalBtn" 
+                    class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg w-full cursor-pointer">
+                    Oke
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @elseif(session('error'))
+    <div id="ErrorModal"
+        class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 text-center w-72">
+            <h2 class="font-bold text-lg text-red-600">Gagal Login!</h2>
+            <p class="text-gray-700 mt-2">{{ session('error') }}</p>
+
+            <div class="mt-5">
+                <button id="closeErrorModalBtn" 
+                    class="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg w-full cursor-pointer">
+                    Oke
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    <script>
+    // Jika Berhasil
+    const successBtn = document.getElementById('closeModalBtn');
+    if (successBtn) {
+        successBtn.addEventListener('click', function () {
+            window.location.href = "/home";
+        });
+    }
+
+    // Jika modal error, reload halaman saat klik Oke
+    const errorBtn = document.getElementById('closeErrorModalBtn');
+    if (errorBtn) {
+        errorBtn.addEventListener('click', function () {
+            window.location.reload(); // ulang halaman login
+        });
+    }
+
+    </script>
+
 @endsection
