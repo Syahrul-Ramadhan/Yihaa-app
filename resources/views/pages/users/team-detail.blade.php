@@ -37,6 +37,15 @@
                             <i class="hgi hgi-stroke hgi-message-02 mr-2"></i>
                             Open Chat
                         </a>
+                        
+                        @if($team['leader_id'] == session('user_id'))
+                            <button 
+                                onclick="document.getElementById('deleteTeamModal').classList.remove('hidden')"
+                                class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition">
+                                <i class="hgi hgi-stroke hgi-delete-02 mr-2"></i>
+                                Delete Team
+                            </button>
+                        @endif
                     @elseif($isPending)
                         <button disabled class="px-6 py-3 bg-gray-600 text-gray-300 font-semibold rounded-xl cursor-not-allowed">
                             <i class="hgi hgi-stroke hgi-time-02 mr-2"></i>
@@ -95,4 +104,37 @@
         alert('{{ session('success') }}');
     </script>
 @endif
+
+<!-- Delete Team Modal -->
+<div id="deleteTeamModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-[#0D1517] rounded-2xl p-6 w-full max-w-md border border-red-500/30">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
+                <i class="hgi hgi-stroke hgi-alert-02 text-2xl text-red-500"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white">Delete Team</h3>
+        </div>
+        
+        <p class="text-gray-300 mb-6">
+            Are you sure you want to delete this team? This action cannot be undone and will remove all team members.
+        </p>
+        
+        <div class="flex gap-3">
+            <button 
+                onclick="document.getElementById('deleteTeamModal').classList.add('hidden')"
+                class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition">
+                Cancel
+            </button>
+            <form action="{{ route('teams.destroy', $team['team_id']) }}" method="POST" class="flex-1">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition">
+                    Delete
+                </button>
+            </form>
+        </div>
+    </div>
+    </div>
+</div>
 @endsection

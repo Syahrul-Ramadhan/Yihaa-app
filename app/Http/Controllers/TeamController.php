@@ -19,7 +19,9 @@ class TeamController extends Controller
 
     public function index()
     {
-        // Query GraphQL untuk ambil data teams
+        $userId = session('user_id');
+
+        // Query GraphQL untuk ambil semua teams
         $query = <<<'GRAPHQL'
         query {
             teamsCollection {
@@ -28,6 +30,7 @@ class TeamController extends Controller
                         team_id
                         team_name
                         team_desc
+                        team_logo
                         team_status
                         member_count
                         member_limit
@@ -55,7 +58,51 @@ class TeamController extends Controller
         $edges = $response->json('data.teamsCollection.edges') ?? [];
         $teams = array_map(fn($edge) => $edge['node'], $edges);
 
-        return view('pages.users.team', compact('teams'));
+        // Query untuk ambil teams yang user sudah join
+        $myTeams = [];
+        if ($userId) {
+            $myTeamsQuery = <<<GRAPHQL
+            query {
+                team_membersCollection(filter: { user_id: { eq: $userId }, status: { eq: "accepted" } }) {
+                    edges {
+                        node {
+                            team_id
+                            role
+                            teams {
+                                team_id
+                                team_name
+                                team_desc
+                                team_logo
+                                team_status
+                                member_count
+                                member_limit
+                                leader_id
+                            }
+                        }
+                    }
+                }
+            }
+            GRAPHQL;
+
+            $myTeamsResponse = Http::withHeaders([
+                'apikey' => env('SUPABASE_ANON_KEY'),
+                'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+                'Content-Type' => 'application/json'
+            ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+                'query' => $myTeamsQuery
+            ]);
+
+            if ($myTeamsResponse->successful()) {
+                $myTeamsEdges = $myTeamsResponse->json('data.team_membersCollection.edges') ?? [];
+                $myTeams = array_map(function($edge) {
+                    $teamData = $edge['node']['teams'];
+                    $teamData['user_role'] = $edge['node']['role'];
+                    return $teamData;
+                }, $myTeamsEdges);
+            }
+        }
+
+        return view('pages.users.team', compact('teams', 'myTeams'));
     }
 
     public function store(Request $request)
@@ -64,7 +111,7 @@ class TeamController extends Controller
             'team_name' => 'required|string|max:100',
             'team_desc' => 'nullable|string',
             'member_limit' => 'required|integer|min:2|max:50',
-            'team_logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'team_logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
         ]);
 
         $userId = session('user_id');
@@ -77,20 +124,37 @@ class TeamController extends Controller
         // Upload logo to Supabase Storage if provided
         if ($request->hasFile('team_logo')) {
             $file = $request->file('team_logo');
+            $bucketName = 'post-images'; // Use existing bucket
             $fileName = 'team_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-            $fileContent = file_get_contents($file->getRealPath());
 
-            // Upload to Supabase Storage
-            $uploadResponse = Http::withHeaders([
-                'apikey' => env('SUPABASE_SERVICE_KEY'),
-                'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
-                'Content-Type' => $file->getMimeType(),
-            ])->send('POST', env('SUPABASE_URL') . '/storage/v1/object/team-logos/' . $fileName, [
-                'body' => $fileContent
-            ]);
+            try {
+                // Upload to Supabase Storage using attach for streaming (better performance)
+                $uploadResponse = Http::timeout(30) // 30 second timeout
+                    ->withHeaders([
+                        'apikey' => env('SUPABASE_SERVICE_KEY'),
+                        'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+                    ])
+                    ->attach(
+                        'file',
+                        fopen($file->getRealPath(), 'r'),
+                        $fileName
+                    )
+                    ->post(env('SUPABASE_URL') . '/storage/v1/object/' . $bucketName . '/' . $fileName);
 
-            if ($uploadResponse->successful()) {
-                $teamLogoUrl = env('SUPABASE_URL') . '/storage/v1/object/public/team-logos/' . $fileName;
+                if ($uploadResponse->successful()) {
+                    $teamLogoUrl = env('SUPABASE_URL') . '/storage/v1/object/public/' . $bucketName . '/' . $fileName;
+                } else {
+                    \Log::warning('Failed to upload team logo, creating team without logo', [
+                        'response' => $uploadResponse->body(),
+                        'status' => $uploadResponse->status(),
+                    ]);
+                    // Continue without logo instead of failing
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Team logo upload timeout or error, creating team without logo', [
+                    'error' => $e->getMessage(),
+                ]);
+                // Continue without logo instead of failing
             }
         }
 
@@ -127,13 +191,54 @@ class TeamController extends Controller
                 'team_name' => $request->team_name,
                 'team_desc' => $request->team_desc,
                 'team_logo' => $teamLogoUrl,
-                'leader_id' => $userId,
-                'member_limit' => $request->member_limit,
+                'leader_id' => (int) $userId,
+                'member_limit' => (int) $request->member_limit,
             ],
         ]);
 
         if ($response->failed() || isset($response->json()['errors'])) {
-            return back()->with('error', 'Failed to create team');
+            \Log::error('Failed to create team', [
+                'response' => $response->body(),
+                'status' => $response->status(),
+                'errors' => $response->json()['errors'] ?? null,
+            ]);
+            return back()->with('error', 'Failed to create team: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'));
+        }
+
+        // Get the created team_id from response
+        $createdTeam = $response->json('data.insertIntoteamsCollection.records')[0] ?? null;
+        
+        if ($createdTeam && isset($createdTeam['team_id'])) {
+            $teamId = $createdTeam['team_id'];
+            
+            // Insert leader as first member into team_members table
+            $memberMutation = <<<'GRAPHQL'
+            mutation InsertTeamMember($team_id: BigInt!, $user_id: BigInt!) {
+                insertIntoteam_membersCollection(
+                    objects: {
+                        team_id: $team_id,
+                        user_id: $user_id,
+                        role: "leader",
+                        status: "accepted",
+                        joined_at: "now()"
+                    }
+                ) {
+                    affectedCount
+                }
+            }
+            GRAPHQL;
+
+            Http::withHeaders([
+                'apikey' => env('SUPABASE_SERVICE_KEY'),
+                'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+                'Content-Type' => 'application/json',
+            ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+                'query' => $memberMutation,
+                'variables' => [
+                    'team_id' => $teamId,
+                    'user_id' => $userId,
+                ],
+            ]);
         }
 
         return redirect()->route('teams.index')->with('success', 'Team created successfully!');
@@ -144,8 +249,8 @@ class TeamController extends Controller
         $userId = session('user_id');
 
         // Query team detail
-        $teamQuery = <<<GRAPHQL
-        query {
+        $teamQuery = <<<'GRAPHQL'
+        query GetTeam($team_id: BigInt!) {
             teamsCollection(filter: { team_id: { eq: $team_id } }) {
                 edges {
                     node {
@@ -168,7 +273,8 @@ class TeamController extends Controller
             'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
             'Content-Type' => 'application/json'
         ])->post(env('SUPABASE_URL') . '/graphql/v1', [
-            'query' => $teamQuery
+            'query' => $teamQuery,
+            'variables' => ['team_id' => (int) $team_id],
         ]);
 
         $teamEdges = $teamResponse->json('data.teamsCollection.edges') ?? [];
@@ -178,8 +284,8 @@ class TeamController extends Controller
         $team = $teamEdges[0]['node'];
 
         // Query team members
-        $membersQuery = <<<GRAPHQL
-        query {
+        $membersQuery = <<<'GRAPHQL'
+        query GetMembers($team_id: BigInt!) {
             team_membersCollection(filter: { team_id: { eq: $team_id }, status: { eq: "accepted" } }) {
                 edges {
                     node {
@@ -200,7 +306,8 @@ class TeamController extends Controller
             'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
             'Content-Type' => 'application/json'
         ])->post(env('SUPABASE_URL') . '/graphql/v1', [
-            'query' => $membersQuery
+            'query' => $membersQuery,
+            'variables' => ['team_id' => (int) $team_id],
         ]);
 
         $membersEdges = $membersResponse->json('data.team_membersCollection.edges') ?? [];
@@ -217,8 +324,8 @@ class TeamController extends Controller
         $isMember = collect($members)->contains('user_id', $userId);
 
         // Check if user has pending request
-        $pendingQuery = <<<GRAPHQL
-        query {
+        $pendingQuery = <<<'GRAPHQL'
+        query CheckPending($team_id: BigInt!, $userId: BigInt!) {
             team_membersCollection(filter: { team_id: { eq: $team_id }, user_id: { eq: $userId }, status: { eq: "pending" } }) {
                 edges {
                     node {
@@ -234,7 +341,11 @@ class TeamController extends Controller
             'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
             'Content-Type' => 'application/json'
         ])->post(env('SUPABASE_URL') . '/graphql/v1', [
-            'query' => $pendingQuery
+            'query' => $pendingQuery,
+            'variables' => [
+                'team_id' => (int) $team_id,
+                'userId' => (int) $userId,
+            ],
         ]);
 
         $isPending = !empty($pendingResponse->json('data.team_membersCollection.edges'));
@@ -250,8 +361,8 @@ class TeamController extends Controller
         }
 
         // Get team leader
-        $teamQuery = <<<GRAPHQL
-        query {
+        $teamQuery = <<<'GRAPHQL'
+        query GetTeamForJoin($team_id: BigInt!) {
             teamsCollection(filter: { team_id: { eq: $team_id } }) {
                 edges {
                     node {
@@ -268,7 +379,8 @@ class TeamController extends Controller
             'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
             'Content-Type' => 'application/json'
         ])->post(env('SUPABASE_URL') . '/graphql/v1', [
-            'query' => $teamQuery
+            'query' => $teamQuery,
+            'variables' => ['team_id' => (int) $team_id],
         ]);
 
         $teamEdges = $teamResponse->json('data.teamsCollection.edges') ?? [];
@@ -343,6 +455,115 @@ class TeamController extends Controller
         ]);
 
         return back()->with('success', 'Join request sent! Waiting for approval.');
+    }
+
+    public function destroy($team_id)
+    {
+        $userId = session('user_id');
+        if (!$userId) {
+            return back()->with('error', 'Please login first');
+        }
+
+        // Check if user is the leader
+        $checkQuery = <<<'GRAPHQL'
+        query CheckLeader($team_id: BigInt!, $userId: BigInt!) {
+            teamsCollection(filter: { team_id: { eq: $team_id }, leader_id: { eq: $userId } }) {
+                edges {
+                    node {
+                        team_id
+                        team_logo
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        $checkResponse = Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json',
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $checkQuery,
+            'variables' => [
+                'team_id' => (int) $team_id,
+                'userId' => (int) $userId,
+            ],
+        ]);
+
+        $edges = $checkResponse->json('data.teamsCollection.edges') ?? [];
+        if (empty($edges)) {
+            return back()->with('error', 'You are not authorized to delete this team');
+        }
+
+        $team = $edges[0]['node'];
+
+        // Delete team logo from storage if exists
+        if (!empty($team['team_logo'])) {
+            try {
+                // Extract filename from URL
+                $urlParts = parse_url($team['team_logo']);
+                $path = $urlParts['path'] ?? '';
+                // Remove /storage/v1/object/public/bucket-name/ prefix
+                $fileName = preg_replace('#^/storage/v1/object/public/[^/]+/#', '', $path);
+                
+                if ($fileName) {
+                    Http::timeout(10)
+                        ->withHeaders([
+                            'apikey' => env('SUPABASE_SERVICE_KEY'),
+                            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+                        ])
+                        ->delete(env('SUPABASE_URL') . '/storage/v1/object/post-images/' . $fileName);
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Failed to delete team logo', ['error' => $e->getMessage()]);
+            }
+        }
+
+        // Delete team members first
+        $deleteMembersMutation = <<<'GRAPHQL'
+        mutation DeleteTeamMembers($team_id: BigInt!) {
+            deleteFromteam_membersCollection(filter: { team_id: { eq: $team_id } }) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json',
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $deleteMembersMutation,
+            'variables' => ['team_id' => (int) $team_id],
+        ]);
+
+        // Delete team
+        $deleteTeamMutation = <<<'GRAPHQL'
+        mutation DeleteTeam($team_id: BigInt!) {
+            deleteFromteamsCollection(filter: { team_id: { eq: $team_id } }) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        $response = Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json',
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $deleteTeamMutation,
+            'variables' => ['team_id' => (int) $team_id],
+        ]);
+
+        if ($response->failed() || isset($response->json()['errors'])) {
+            \Log::error('Failed to delete team', [
+                'response' => $response->body(),
+                'errors' => $response->json()['errors'] ?? null,
+            ]);
+            return back()->with('error', 'Failed to delete team');
+        }
+
+        return redirect()->route('teams.index')->with('success', 'Team deleted successfully');
     }
 
     // public function viewTeam()

@@ -12,12 +12,28 @@ class MateriController extends Controller
         return view('pages.materi');
     }
 
-    public function index()
+    public function index(Request $request)
     {
+        // Tangkap input pencarian
+        $search = $request->input('search');
+
+        $filter = null;
+        if ($search) {
+            $filter = [
+                'or' => [
+                    ['tittle' => ['ilike' => '%' . $search . '%']],
+                    ['description' => ['ilike' => '%' . $search . '%']]
+                ]
+            ];
+        }
+
         // Query GraphQL untuk ambil data materials
         $query = <<<'GRAPHQL'
-        query {
-            materialsCollection(orderBy: { material_id: DescNullsLast }) {
+        query($filter: materialsFilter) {
+            materialsCollection(
+                filter: $filter,
+                orderBy: { material_id: DescNullsLast }
+            ) {
                 edges {
                     node {
                         material_id
@@ -42,6 +58,9 @@ class MateriController extends Controller
             'Content-Type' => 'application/json',
         ])->post(env('SUPABASE_URL') . '/graphql/v1', [
             'query' => $query,
+            'variables' => [
+                'filter' => $filter
+            ]
         ]);
 
         if ($response->failed()) {

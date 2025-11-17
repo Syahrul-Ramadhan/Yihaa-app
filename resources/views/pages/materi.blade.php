@@ -117,7 +117,7 @@
         {{-- Daftar Materi --}}
         <div id="materiList" class="space-y-6">
             @foreach ($materials as $item)
-                <div class="bg-gradient-to-r from-[#122E32] to-[#0B1A1C] p-6 rounded-2xl shadow-md text-white" x-data="{ dropdownOpen: false, showDeleteModal: false }">
+                <div class="bg-gradient-to-r from-[#122E32] to-[#0B1A1C] p-6 rounded-2xl shadow-md text-white" x-data="{ dropdownOpen: false, showDeleteModal: false, expanded: false }">
                     <div class="flex items-center justify-between mb-4">
                         <div class="flex items-center">
                             @if (!empty($item['user']['avatar_url']))
@@ -166,7 +166,29 @@
                         <img src="{{ $item['thumbnail_url'] }}" alt="Materi Image" class="w-full rounded-lg mb-3">
                     @endif
 
-                    <p class="text-gray-300 text-sm">{{ $item['description'] }}</p>
+                    {{-- Description with expand/collapse --}}
+                    <div class="text-gray-300 text-sm">
+                        @php
+                            $description = $item['description'];
+                            $charLimit = 200; // Batas karakter sebelum perlu expand
+                            $needsExpand = strlen($description) > $charLimit;
+                        @endphp
+                        
+                        @if ($needsExpand)
+                            <p x-show="!expanded" class="mb-2">
+                                {{ Str::limit($description, $charLimit) }}
+                            </p>
+                            <p x-show="expanded" x-cloak class="mb-2">
+                                {{ $description }}
+                            </p>
+                            <button @click="expanded = !expanded" class="text-teal-400 hover:text-teal-300 font-medium text-sm transition">
+                                <span x-show="!expanded">Lihat Lebih Banyak</span>
+                                <span x-show="expanded" x-cloak>Lihat Lebih Sedikit</span>
+                            </button>
+                        @else
+                            <p>{{ $description }}</p>
+                        @endif
+                    </div>
 
                     {{-- Delete Confirmation Modal --}}
                     <div x-show="showDeleteModal" 
@@ -208,12 +230,6 @@
                             </div>
                         </div>
                     </div>
-
-                    @if (!empty($item['file_url']) && !str_contains($item['file_url'], 'placeholder'))
-                        <a href="{{ $item['file_url'] }}" target="_blank" class="text-teal-400 text-sm mt-2 inline-block hover:underline">
-                            READ MORE
-                        </a>
-                    @endif
                 </div>
             @endforeach
 

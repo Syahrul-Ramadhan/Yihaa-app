@@ -45,6 +45,7 @@ Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
     Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
     Route::get('/teams/{id}', [TeamController::class, 'show'])->name('teams.show');
+    Route::delete('/teams/{id}', [TeamController::class, 'destroy'])->name('teams.destroy');
     Route::post('/teams/{id}/join', [TeamController::class, 'join'])->name('teams.join');
     Route::get('/chat', [TeamChatController::class, 'index'])->name('chat.index');
     Route::get('/chat/{team_id}', [TeamChatController::class, 'show'])->name('chat.show');

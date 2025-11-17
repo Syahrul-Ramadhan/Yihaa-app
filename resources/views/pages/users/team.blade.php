@@ -13,6 +13,51 @@
         </div>
 
         <section class="py-5">
+            <!-- My Teams Section -->
+            @if(!empty($myTeams))
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                    <i class="hgi hgi-stroke hgi-star text-[#2aa3ef]"></i>
+                    My Teams
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    @foreach ($myTeams as $team)
+                        <a href="{{ route('teams.show', $team['team_id']) }}" class="bg-gradient-to-br from-[#2aa3ef20] to-[#ffffff0a] backdrop-blur-md border border-[#2aa3ef] p-5 rounded-2xl shadow-md text-white hover:scale-[1.02] hover:shadow-[#2aa3ef40] transition duration-300 cursor-pointer">
+                            <!-- Header -->
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="bg-[#2aa3ef40] p-3 rounded-full w-14 h-14 flex items-center justify-center overflow-hidden">
+                                        @if(isset($team['team_logo']) && $team['team_logo'])
+                                            <img src="{{ $team['team_logo'] }}" alt="team logo" class="w-full h-full object-cover rounded-full">
+                                        @else
+                                            <i class="hgi hgi-stroke hgi-group text-2xl text-[#2aa3ef]"></i>
+                                        @endif
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-lg">{{ $team['team_name'] }}</h3>
+                                        <p class="text-sm text-gray-400">
+                                            {{ $team['member_count'] }}/{{ $team['member_limit'] }}
+                                        </p>
+                                    </div>
+                                </div>
+                                @if(isset($team['user_role']) && $team['user_role'] === 'leader')
+                                    <span class="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full border border-yellow-500/40">Leader</span>
+                                @endif
+                            </div>
+
+                            <!-- Description -->
+                            <p class="text-sm text-gray-300 mb-5 line-clamp-2">{{ $team['team_desc'] }}</p>
+
+                            <!-- View Details Button -->
+                            <div class="w-full py-2 bg-[#2aa3ef] hover:bg-[#2aa3efcc] text-white font-semibold rounded-xl transition cursor-pointer text-center">
+                                View Details
+                            </div>
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-white">Cari Tim yang Cocok untukmu!</h2>
                 <button 
