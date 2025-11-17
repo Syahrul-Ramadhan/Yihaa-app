@@ -4,15 +4,37 @@ use App\Helpers\SupabaseHelper;
 use App\Models\Post;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class PostController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // Query GraphQL untuk ambil data teams
+        // 1. Tangkap input pencarian
+        $search = $request->input('search');
+
+        $filter = null; // Default: tidak ada filter
+        if ($search) {
+            $filter = [
+                'caption' => [
+                    'ilike' => '%' . $search . '%'
+                ]
+            ];
+        }
+
+        // 2. Query GraphQL - PERBAIKAN FINAL (KEMBALI KE postsCollection)
         $query = <<<'GRAPHQL'
-        query {
-            postsCollection {
+        query($filter: postsFilter) {
+            
+            # ▼▼▼ UBAH KEMBALI KE 'postsCollection' ▼▼▼
+            postsCollection(
+                filter: $filter, 
+                
+                # ▼ SINTAKS 'orderBy' YANG BENAR ▼
+                orderBy: [{ created_at: DescNullsLast }]
+            
+            ) {
                 edges {
                     node {
                         post_id
@@ -20,26 +42,11 @@ class PostController extends Controller
                         image_url
                         created_at
                         uploaded_by
+                        
+                        # --- RELASI KE USERS ---
                         users {
                             name
                             avatar_url
-                        }
-                        likesCollection {
-                            edges {
-                                node {
-                                    like_id
-                                    user_id
-                                }
-                            }
-                        }
-                        commentsCollection {
-                            edges {
-                                node {
-                                    comment_id
-                                    user_id
-                                    content
-                                }
-                            }
                         }
                     }
                 }
@@ -48,17 +55,24 @@ class PostController extends Controller
         GRAPHQL;
 
         $response = Http::withHeaders([
-            'apikey' => env('SUPABASE_ANON_KEY'),
-            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
             'Content-Type' => 'application/json',
         ])->post(env('SUPABASE_URL') . '/graphql/v1', [
             'query' => $query,
+            'variables' => [
+                'filter' => $filter
+            ]
         ]);
 
         if ($response->failed()) {
-            dd('Error GraphQL: ' . $response->body());
+            dd('Error HTTP Gagal: ' . (string) $response->body());
         }
-
+        
+        // ▼▼▼ BIARKAN INI TETAP ADA SAMPAI BERHASIL ▼▼▼
+        if ($response->json('errors')) {
+             dd('Error payload GraphQL: ', $response->json('errors'));
+        }
         
         // Ambil node data
         $edges = $response->json('data.postsCollection.edges') ?? [];
@@ -71,28 +85,75 @@ class PostController extends Controller
                 'caption' => $node['caption'],
                 'image_url' => $node['image_url'],
                 'created_at' => $node['created_at'],
-                'user' => $node['users'],
-                'likes_count' => count($node['likesCollection']['edges'] ?? []),
-                'comments_count' => count($node['commentsCollection']['edges'] ?? []),
+                'uploader_name' => $node['users']['name'] ?? 'Unknown',
+                'uploader_avatar' => $node['users']['avatar_url'] ?? null,
+                'likes_count' => 0, // Default karena tabel likes belum ada
+                'comments_count' => 0, // Default karena tabel comments belum ada
             ];
         });
 
         return view('pages.users.home', compact('posts'));
     }
 
-    public function testInsert()
+    public function store(Request $request)
     {
-        $post = new \App\Models\Post();
+        // 1. Validasi input dari form
+        $request->validate([
+            'caption' => 'required|string|max:2000',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
 
-        $post->caption = "Ini postingan percobaan untuk uji insert ke Supabase.";
-        $post->image_url = "https://via.placeholder.com/600x300.png?text=Contoh+Gambar";
-        $post->uploaded_by = 1;
+        $imageUrl = null;
+
+        // 2. Proses upload gambar (jika ada)
+        if ($request->hasFile('image')) {
+            $file = $request->file('image');
+            
+            $bucketName = 'post-images'; // Ini sudah benar
+            
+            // ▼ PERUBAHAN 1: Hapus $bucketName . '/' dari sini
+            $fileName = time() . '_' . $file->getClientOriginalName();
+            
+           // Upload ke Supabase Storage
+            $storageResponse = Http::withHeaders([
+                'apikey' => env('SUPABASE_SERVICE_KEY'),
+                'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            ])
+            ->withBody(
+                $file->getContent(), 
+                $file->getMimeType()
+            )
+            // ▼ PERUBAHAN 2: Ubah URL post. Hapus '/public/' dan masukkan $bucketName
+            ->post(env('SUPABASE_URL') . '/storage/v1/object/' . $bucketName . '/' . $fileName);
+
+            if ($storageResponse->failed()) {
+                // Tampilkan pesan error yang lebih jelas untuk debugging
+                // dd($storageResponse->json()); 
+                return back()->with('error', 'Gagal mengupload gambar. (Storage API Error)');
+            }
+            
+            // ▼ PERUBAHAN 3: Tambahkan $bucketName di URL publik
+            $imageUrl = env('SUPABASE_URL') . '/storage/v1/object/public/' . $bucketName . '/' . $fileName;
+        }
+
+        // 4. Simpan data ke database (menggunakan Model)
+        $post = new \App\Models\Post();
+        
+        $post->caption = $request->input('caption'); // Ambil dari form
+        $post->image_url = $imageUrl; // Hasil upload (bisa null)
+        
+        // Ambil user_id dari session
+        $userId = session('user_id');
+        if (!$userId) {
+            return back()->with('error', 'Please login first');
+        }
+        
+        $post->uploaded_by = $userId; // User yang sedang login
         $post->created_at = now();
 
-        $post->save();
+        $post->save(); // Model akan mengirim ini ke Supabase
 
-        return "✅ Data berhasil ditambahkan! ID baru: " . $post->post_id;
+        // 5. Kembalikan ke halaman home
+        return redirect()->route('posts.index')->with('success', 'Postingan berhasil ditambahkan!');
     }
-
-
 }
