@@ -17,14 +17,23 @@ class TeamController extends Controller
         $this->supabaseKey = env('SUPABASE_ANON_KEY');
     }
 
-    public function index()
+    public function index(Request $request)
     {
         $userId = session('user_id');
+        $search = $request->input('search');
 
-        // Query GraphQL untuk ambil semua teams
-        $query = <<<'GRAPHQL'
+        // Build filter hanya jika ada search query
+        $filterClause = '';
+        if (!empty($search)) {
+            // Escape quotes dan build filter
+            $searchEscaped = str_replace('"', '\\"', $search);
+            $filterClause = '(filter: { team_name: { ilike: "%' . $searchEscaped . '%" } })';
+        }
+
+        // Query GraphQL untuk ambil semua teams (atau filtered jika ada search)
+        $query = <<<GRAPHQL
         query {
-            teamsCollection {
+            teamsCollection$filterClause {
                 edges {
                     node {
                         team_id
@@ -102,7 +111,7 @@ class TeamController extends Controller
             }
         }
 
-        return view('pages.users.team', compact('teams', 'myTeams'));
+        return view('pages.users.team', compact('teams', 'myTeams', 'search'));
     }
 
     public function store(Request $request)

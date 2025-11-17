@@ -2,15 +2,22 @@
 @section('content')
     <div>
         <!-- Search Bar -->
-        <div class="relative">
+        <form action="{{ route('teams.index') }}" method="GET" class="relative">
             <input 
                 type="text" 
-                class="peer py-2.5 sm:py-3 px-4 ps-11 block w-full bg-gradient-to-l from-[#163F44] to-[#020C0D] border border-gray-600 rounded-lg sm:text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none" 
-                placeholder="Search">
+                name="search"
+                value="{{ $search ?? '' }}"
+                class="peer py-2.5 sm:py-3 px-4 ps-11 block w-full bg-gradient-to-l from-[#163F44] to-[#020C0D] border border-gray-600 rounded-lg sm:text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none text-white" 
+                placeholder="Search team by name...">
             <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-4 peer-disabled:opacity-50 peer-disabled:pointer-events-none">
-                <i class="hgi hgi-stroke hgi-search-01"></i>
+                <i class="hgi hgi-stroke hgi-search-01 text-gray-400"></i>
             </div>
-        </div>
+            @if(!empty($search))
+                <a href="{{ route('teams.index') }}" class="absolute inset-y-0 end-0 flex items-center pe-4 text-gray-400 hover:text-white transition">
+                    <i class="hgi hgi-stroke hgi-cancel-01"></i>
+                </a>
+            @endif
+        </form>
 
         <section class="py-5">
             <!-- My Teams Section -->
