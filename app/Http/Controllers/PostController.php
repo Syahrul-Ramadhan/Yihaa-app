@@ -43,26 +43,11 @@ class PostController extends Controller
                         created_at
                         uploaded_by
                         
-                        # --- RELASI DIAKTIFKAN ---
+                        # --- RELASI KE USERS ---
                         users {
                             name
                             avatar_url
                         }
-                        likesCollection {
-                            edges {
-                                node {
-                                    like_id
-                                }
-                            }
-                        }
-                        commentsCollection {
-                            edges {
-                                node {
-                                    comment_id
-                                }
-                            }
-                        }
-                        # --- BATAS RELASI ---
                     }
                 }
             }
@@ -100,9 +85,10 @@ class PostController extends Controller
                 'caption' => $node['caption'],
                 'image_url' => $node['image_url'],
                 'created_at' => $node['created_at'],
-                'user' => $node['users'] ?? null,
-                'likes_count' => count($node['likesCollection']['edges'] ?? []),
-                'comments_count' => count($node['commentsCollection']['edges'] ?? []),
+                'uploader_name' => $node['users']['name'] ?? 'Unknown',
+                'uploader_avatar' => $node['users']['avatar_url'] ?? null,
+                'likes_count' => 0, // Default karena tabel likes belum ada
+                'comments_count' => 0, // Default karena tabel comments belum ada
             ];
         });
 

@@ -161,6 +161,9 @@ class AuthController extends Controller
             return back()->with('error', 'Password salah.');
         }
 
+        // Regenerate session untuk keamanan
+        $request->session()->regenerate();
+
         // Simpan data user di session
         session([
             'user_id' => $user['id'],
@@ -168,8 +171,12 @@ class AuthController extends Controller
             'user_email' => $user['email'],
             'user_role' => $user['role'],
             'avatar_url' => $user['avatar_url'],
-
         ]);
+
+        // Update user_id di tabel sessions
+        \DB::table('sessions')
+            ->where('id', session()->getId())
+            ->update(['user_id' => $user['id']]);
 
         return back()->with('login_success', 'Login berhasil! Selamat datang, ' . $user['name']);
 

@@ -34,8 +34,12 @@
                 <a href="{{ route('chat.show', $team['team_id']) }}"
                    class="flex items-center gap-3 px-3 py-2 hover:bg-neutral-900 rounded 
                           {{ isset($activeTeam) && $activeTeam['team_id'] === $team['team_id'] ? 'bg-neutral-800' : '' }}">
-                    <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-sm font-bold">
-                        <img src="{{ $team['team_icon'] }}" alt="team-icon" class="rounded-xl object-cover object-center" width="24" height="24">
+                    <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-sm font-bold overflow-hidden">
+                        @if(isset($team['team_logo']) && $team['team_logo'])
+                            <img src="{{ $team['team_logo'] }}" alt="team-logo" class="w-full h-full rounded-full object-cover">
+                        @else
+                            <i class="hgi hgi-stroke hgi-group text-sm text-[#2aa3ef]"></i>
+                        @endif
                     </div>
                     <span class="text-sm">{{ $team['team_name'] }}</span>
                 </a>
@@ -56,7 +60,13 @@
         @else
             {{-- Header Chat --}}
             <div class="border-b border-gray-700 p-4 font-semibold flex items-center gap-3">
-                <img src="{{ $team['team_icon'] }}" alt="team-icon" class="rounded-full object-cover object-center" width="32" height="32">
+                @if(isset($activeTeam['team_logo']) && $activeTeam['team_logo'])
+                    <img src="{{ $activeTeam['team_logo'] }}" alt="team-logo" class="rounded-full object-cover" width="32" height="32">
+                @else
+                    <div class="w-8 h-8 bg-[#2aa3ef20] rounded-full flex items-center justify-center">
+                        <i class="hgi hgi-stroke hgi-group text-lg text-[#2aa3ef]"></i>
+                    </div>
+                @endif
                 <span>{{ $activeTeam['team_name'] ?? 'Team Chat' }}</span>
             </div>
 
@@ -81,10 +91,13 @@
 
             {{-- Input Chat --}}
             <div class="p-4 border-t border-gray-700">
-                <form action="#" method="POST" class="flex gap-3">
-                    <input type="text" name="message" placeholder="Write a message..." 
-                           class="flex-1 bg-[#1A232B] px-4 py-2 rounded-lg text-sm focus:outline-none">
-                    <button type="submit" class="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700">Send</button>
+                <form action="{{ route('chat.send', $activeTeam['team_id']) }}" method="POST" class="flex gap-3">
+                    @csrf
+                    <input type="text" name="message" placeholder="Write a message..." required
+                           class="flex-1 bg-[#1A232B] px-4 py-2 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#2aa3ef]">
+                    <button type="submit" class="bg-[#2aa3ef] px-6 py-2 rounded-lg hover:bg-[#2aa3efcc] text-white font-semibold transition">
+                        <i class="hgi hgi-stroke hgi-sent-02"></i>
+                    </button>
                 </form>
             </div>
         @endif

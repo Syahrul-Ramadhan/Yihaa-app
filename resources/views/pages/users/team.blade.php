@@ -13,7 +13,16 @@
         </div>
 
         <section class="py-5">
-            <h2 class="text-2xl font-bold text-white mb-6">Cari Tim yang Cocok untukmu!</h2>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-white">Cari Tim yang Cocok untukmu!</h2>
+                <button 
+                    onclick="document.getElementById('createTeamModal').classList.remove('hidden')"
+                    class="px-4 py-2 bg-[#2aa3ef] hover:bg-[#2aa3efcc] text-white font-semibold rounded-xl transition cursor-pointer flex items-center gap-2"
+                >
+                    <i class="hgi hgi-stroke hgi-add-circle"></i>
+                    Create Team
+                </button>
+            </div>
 
             <!-- team container -->
             @if (empty($teams))
@@ -21,12 +30,16 @@
             @else
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     @foreach ($teams as $team)
-                        <div class="bg-[#ffffff0a] backdrop-blur-md border border-[#2aa3ef20] p-5 rounded-2xl shadow-md text-white hover:scale-[1.02] hover:border-[#2aa3ef80] transition duration-300">
+                        <a href="{{ route('teams.show', $team['team_id']) }}" class="bg-[#ffffff0a] backdrop-blur-md border border-[#2aa3ef20] p-5 rounded-2xl shadow-md text-white hover:scale-[1.02] hover:border-[#2aa3ef80] transition duration-300 cursor-pointer">
                             <!-- Header -->
                             <div class="flex justify-between items-start mb-4">
                                 <div class="flex items-center gap-3">
-                                    <div class="bg-[#2aa3ef20] p-3 rounded-full">
-                                        <img src="{{ $team['team_icon'] }}" alt="team-icon" class="rounded-xl object-cover object-center" width="32" height="32">
+                                    <div class="bg-[#2aa3ef20] p-3 rounded-full w-14 h-14 flex items-center justify-center overflow-hidden">
+                                        @if(isset($team['team_logo']) && $team['team_logo'])
+                                            <img src="{{ $team['team_logo'] }}" alt="team logo" class="w-full h-full object-cover rounded-full">
+                                        @else
+                                            <i class="hgi hgi-stroke hgi-group text-2xl text-[#2aa3ef]"></i>
+                                        @endif
                                     </div>
                                     <div>
                                         <h3 class="font-semibold text-lg">{{ $team['team_name'] }}</h3>
@@ -38,17 +51,85 @@
                             </div>
 
                             <!-- Description -->
-                            <p class="text-sm text-gray-300 mb-5">{{ $team['team_desc'] }}</p>
+                            <p class="text-sm text-gray-300 mb-5 line-clamp-2">{{ $team['team_desc'] }}</p>
 
-                            <!-- Join button -->
-                            <button class="w-full py-2 bg-[#2aa3ef] hover:bg-[#2aa3efcc] text-white font-semibold rounded-xl transition cursor-pointer">
-                                Join
-                            </button>
-                        </div>
+                            <!-- View Details Button -->
+                            <div class="w-full py-2 bg-[#2aa3ef] hover:bg-[#2aa3efcc] text-white font-semibold rounded-xl transition cursor-pointer text-center">
+                                View Details
+                            </div>
+                        </a>
                     @endforeach
                 </div>
             @endif
         </section>
     </div>
+
+    <!-- Modal Create Team -->
+    <div id="createTeamModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-[#0D1517] rounded-2xl p-6 w-full max-w-md mx-4 border border-[#2aa3ef20]">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-white">Create New Team</h3>
+                <button onclick="document.getElementById('createTeamModal').classList.add('hidden')" class="text-gray-400 hover:text-white">
+                    <i class="hgi hgi-stroke hgi-cancel-01 text-2xl"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Form -->
+            <form action="{{ route('teams.store') }}" method="POST" enctype="multipart/form-data" class="bg-[#0e1525] rounded-2xl p-8 max-w-md w-full mx-4">
+                @csrf
+                
+                <!-- Team Logo Upload -->
+                <div class="mb-5">
+                    <label for="team_logo" class="block text-sm font-medium text-gray-300 mb-2">Team Logo</label>
+                    <div class="flex items-center gap-4">
+                        <div id="logoPreview" class="bg-[#2aa3ef20] p-4 rounded-xl w-20 h-20 flex items-center justify-center overflow-hidden">
+                            <i class="hgi hgi-stroke hgi-group text-3xl text-[#2aa3ef]"></i>
+                        </div>
+                        <label for="team_logo" class="px-4 py-2 bg-[#2aa3ef20] hover:bg-[#2aa3ef30] border border-[#2aa3ef] text-[#2aa3ef] rounded-lg cursor-pointer transition">
+                            Choose Image
+                            <input type="file" id="team_logo" name="team_logo" accept="image/*" class="hidden">
+                        </label>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">Recommended: Square image, max 2MB</p>
+                </div>
+
+                <div>
+                    <label class="block text-white mb-2">Team Name</label>
+                    <input type="text" name="team_name" required 
+                        class="w-full bg-[#ffffff0a] border border-[#2aa3ef20] rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#2aa3ef]">
+                </div>
+                <div>
+                    <label class="block text-white mb-2">Description</label>
+                    <textarea name="team_desc" rows="3" 
+                        class="w-full bg-[#ffffff0a] border border-[#2aa3ef20] rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#2aa3ef]"></textarea>
+                </div>
+                <div>
+                    <label class="block text-white mb-2">Member Limit</label>
+                    <input type="number" name="member_limit" value="5" min="2" max="50" required
+                        class="w-full bg-[#ffffff0a] border border-[#2aa3ef20] rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#2aa3ef]">
+                </div>
+                <button type="submit" class="w-full py-2 bg-[#2aa3ef] hover:bg-[#2aa3efcc] text-white font-semibold rounded-xl transition">
+                    Create Team
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Logo Preview
+            document.getElementById('team_logo')?.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const preview = document.getElementById('logoPreview');
+                        preview.innerHTML = `<img src="${e.target.result}" alt="Logo Preview" class="w-full h-full object-cover rounded-xl">`;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        });
+    </script>
     
 @endsection

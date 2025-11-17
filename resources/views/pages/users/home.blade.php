@@ -84,11 +84,11 @@
                 @foreach ($posts as $post)
                 <div class="bg-[#2aa3ef07] p-6 rounded-2xl shadow-md text-white">
                     <div class="flex items-center mb-4">
-                    <img src="{{ $post['user']['avatar_url']  ?? 'https://qdfotopajdiuailyeprh.supabase.co/storage/v1/object/public/avatars/default-user.jpg' }}" 
-                        alt="{{ $post['user']['name'] ?? 'User' }}" 
+                    <img src="{{ $post['uploader_avatar']  ?? 'https://qdfotopajdiuailyeprh.supabase.co/storage/v1/object/public/avatars/default-user.jpg' }}" 
+                        alt="{{ $post['uploader_name'] ?? 'User' }}" 
                         class="w-10 h-10 rounded-full mr-3 object-cover">
                     <div>
-                        <p class="font-semibold">{{ $post['user']['name'] ?? 'Anonim' }}</p>
+                        <p class="font-semibold">{{ $post['uploader_name'] ?? 'Anonim' }}</p>
                         <p class="text-xs text-gray-400">{{ \Carbon\Carbon::parse($post['created_at'])->diffForHumans() }}</p>
                     </div>
                     </div>
@@ -126,7 +126,7 @@
 
                             <!-- Share -->
                             <button 
-                                @click="navigator.share ? navigator.share({ title: 'Post dari {{ $post['user']['name'] }}', url: '{{ url('/post/' . $post['post_id']) }}' }) : navigator.clipboard.writeText('{{ url('/post/' . $post['post_id']) }}')"
+                                @click="navigator.share ? navigator.share({ title: 'Post dari {{ $post['uploader_name'] }}', url: '{{ url('/post/' . $post['post_id']) }}' }) : navigator.clipboard.writeText('{{ url('/post/' . $post['post_id']) }}')"
                                 class="flex items-center gap-1 transition cursor-pointer"
                             >
                                 <i class="hgi hgi-stroke hgi-sent text-2xl text-white"></i>

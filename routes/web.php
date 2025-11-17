@@ -37,11 +37,16 @@ Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::get('/lomba', [EventController::class, 'viewLomba'])->name('lomba');
     // materi
     Route::get('/materi', [MateriController::class, 'index'])->name('materi.index');
+    Route::post('/materi', [MateriController::class, 'store'])->name('materi.store');
     Route::get('/notifikasi', [NotifikasiController::class, 'viewNotifikasi'])->name('index');
     // team
     Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
+    Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
+    Route::get('/teams/{id}', [TeamController::class, 'show'])->name('teams.show');
+    Route::post('/teams/{id}/join', [TeamController::class, 'join'])->name('teams.join');
     Route::get('/chat', [TeamChatController::class, 'index'])->name('chat.index');
     Route::get('/chat/{team_id}', [TeamChatController::class, 'show'])->name('chat.show');
+    Route::post('/chat/{team_id}/send', [TeamChatController::class, 'sendMessage'])->name('chat.send');
     // profile
     Route::get('/profile', [AuthController::class, 'profile'])->name('profile');
 
