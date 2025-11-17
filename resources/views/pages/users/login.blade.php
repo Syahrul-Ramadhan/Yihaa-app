@@ -47,6 +47,22 @@
         </div>
     </div>
 
+    @elseif(session('logout_success'))
+    <div id="logoutModal"
+        class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 text-center w-72">
+            <h2 class="font-bold text-lg text-green-600">Logout Berhasil!</h2>
+            <p class="text-gray-700 mt-2">{{ session('logout_success') }}</p>
+
+            <div class="mt-5">
+                <button id="closeLogoutModalBtn" 
+                    class="px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg w-full cursor-pointer">
+                    Oke
+                </button>
+            </div>
+        </div>
+    </div>
+
     @elseif(session('error'))
     <div id="ErrorModal"
         class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
@@ -65,11 +81,19 @@
     @endif
 
     <script>
-    // Jika Berhasil
+    // Jika Login Berhasil - redirect ke home
     const successBtn = document.getElementById('closeModalBtn');
     if (successBtn) {
         successBtn.addEventListener('click', function () {
             window.location.href = "/home";
+        });
+    }
+
+    // Jika Logout Berhasil - just close modal, stay on login page
+    const logoutBtn = document.getElementById('closeLogoutModalBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function () {
+            document.getElementById('logoutModal').style.display = 'none';
         });
     }
 

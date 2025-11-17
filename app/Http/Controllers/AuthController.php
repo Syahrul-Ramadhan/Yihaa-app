@@ -186,7 +186,7 @@ class AuthController extends Controller
     public function logout(Request $request)
     {
         $request->session()->flush(); // hapus semua session
-        return redirect()->route('login')->with('login_success', 'Berhasil logout!');
+        return redirect()->route('login')->with('logout_success', 'Berhasil logout!');
     }
 
     public function profile(Request $request)
