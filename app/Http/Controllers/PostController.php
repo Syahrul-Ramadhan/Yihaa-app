@@ -85,6 +85,7 @@ class PostController extends Controller
                 'caption' => $node['caption'],
                 'image_url' => $node['image_url'],
                 'created_at' => $node['created_at'],
+                'uploaded_by' => $node['uploaded_by'], // Tambahkan ini untuk validasi delete
                 'uploader_name' => $node['users']['name'] ?? 'Unknown',
                 'uploader_avatar' => $node['users']['avatar_url'] ?? null,
                 'likes_count' => 0, // Default karena tabel likes belum ada
@@ -153,7 +154,88 @@ class PostController extends Controller
 
         $post->save(); // Model akan mengirim ini ke Supabase
 
+        
         // 5. Kembalikan ke halaman home
         return redirect()->route('posts.index')->with('success', 'Postingan berhasil ditambahkan!');
+    }
+
+    public function destroy($post_id)
+    {
+        $userId = session('user_id');
+        $userRole = session('role');
+
+        if (!$userId) {
+            return back()->with('error', 'Please login first');
+        }
+
+        // Query post untuk validasi ownership
+        $postQuery = <<<GRAPHQL
+        query {
+            postsCollection(filter: { post_id: { eq: $post_id } }) {
+                edges {
+                    node {
+                        post_id
+                        uploaded_by
+                        image_url
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        $postResponse = Http::withHeaders([
+            'apikey' => env('SUPABASE_ANON_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $postQuery
+        ]);
+
+        $postEdges = $postResponse->json('data.postsCollection.edges') ?? [];
+        
+        if (empty($postEdges)) {
+            return back()->with('error', 'Post not found');
+        }
+
+        $post = $postEdges[0]['node'];
+
+        // Validasi: hanya owner atau admin yang bisa delete
+        if ($userRole !== 'admin' && $post['uploaded_by'] != $userId) {
+            return back()->with('error', 'You are not authorized to delete this post');
+        }
+
+        // Delete post via GraphQL
+        $mutation = <<<GRAPHQL
+        mutation {
+            deleteFrompostsCollection(filter: { post_id: { eq: $post_id } }) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        $deleteResponse = Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json',
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $mutation
+        ]);
+
+        if ($deleteResponse->failed() || isset($deleteResponse->json()['errors'])) {
+            return back()->with('error', 'Failed to delete post');
+        }
+
+        // Optional: Hapus gambar dari storage jika ada
+        if (!empty($post['image_url'])) {
+            // Extract filename from URL
+            $fileName = basename(parse_url($post['image_url'], PHP_URL_PATH));
+            
+            Http::withHeaders([
+                'apikey' => env('SUPABASE_SERVICE_KEY'),
+                'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            ])->delete(env('SUPABASE_URL') . '/storage/v1/object/post-images/' . $fileName);
+        }
+
+        return redirect()->route('posts.index')->with('success', 'Post deleted successfully!');
     }
 }

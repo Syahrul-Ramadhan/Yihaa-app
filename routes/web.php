@@ -30,6 +30,7 @@ Route::view('/dashboard', 'dashboard')->name('dashboard');
 
     Route::get('/home', [PostController::class, 'index'])->name('posts.index');
     Route::post('/post/store', [PostController::class, 'store'])->name('posts.store');
+    Route::delete('/post/{id}', [PostController::class, 'destroy'])->name('posts.destroy');
     Route::get('/test-insert', [PostController::class, 'testInsert']);
     // event
     Route::get('/seminar', [EventController::class, 'viewSeminar'])->name('seminar');

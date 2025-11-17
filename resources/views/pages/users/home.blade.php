@@ -82,15 +82,42 @@
             <div id="postList" class="space-y-6">
                 <!-- post card -->
                 @foreach ($posts as $post)
-                <div class="bg-[#2aa3ef07] p-6 rounded-2xl shadow-md text-white">
-                    <div class="flex items-center mb-4">
-                    <img src="{{ $post['uploader_avatar']  ?? 'https://qdfotopajdiuailyeprh.supabase.co/storage/v1/object/public/avatars/default-user.jpg' }}" 
-                        alt="{{ $post['uploader_name'] ?? 'User' }}" 
-                        class="w-10 h-10 rounded-full mr-3 object-cover">
-                    <div>
-                        <p class="font-semibold">{{ $post['uploader_name'] ?? 'Anonim' }}</p>
-                        <p class="text-xs text-gray-400">{{ \Carbon\Carbon::parse($post['created_at'])->diffForHumans() }}</p>
-                    </div>
+                <div class="bg-[#2aa3ef07] p-6 rounded-2xl shadow-md text-white" x-data="{ dropdownOpen: false }">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center">
+                            <img src="{{ $post['uploader_avatar']  ?? 'https://qdfotopajdiuailyeprh.supabase.co/storage/v1/object/public/avatars/default-user.jpg' }}" 
+                                alt="{{ $post['uploader_name'] ?? 'User' }}" 
+                                class="w-10 h-10 rounded-full mr-3 object-cover">
+                            <div>
+                                <p class="font-semibold">{{ $post['uploader_name'] ?? 'Anonim' }}</p>
+                                <p class="text-xs text-gray-400">{{ \Carbon\Carbon::parse($post['created_at'])->diffForHumans() }}</p>
+                            </div>
+                        </div>
+
+                        {{-- Dropdown Menu (Titik Tiga) --}}
+                        @if(session('role') === 'admin' || session('user_id') == $post['uploaded_by'])
+                        <div class="relative">
+                            <button @click="dropdownOpen = !dropdownOpen" class="text-gray-400 hover:text-white p-2">
+                                <i class="hgi hgi-stroke hgi-more-vertical text-xl"></i>
+                            </button>
+                            
+                            {{-- Dropdown Content --}}
+                            <div x-show="dropdownOpen" 
+                                 @click.away="dropdownOpen = false"
+                                 x-transition
+                                 class="absolute right-0 mt-2 w-48 bg-[#1a1a1a] rounded-lg shadow-lg border border-gray-700 z-10">
+                                <form action="{{ route('posts.destroy', $post['post_id']) }}" method="POST" 
+                                      onsubmit="return confirm('Yakin mau hapus postingan ini?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/20 rounded-lg flex items-center gap-2">
+                                        <i class="hgi hgi-stroke hgi-delete-02"></i>
+                                        Hapus Post
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        @endif
                     </div>
 
                     <p class="text-gray-200 mb-3">{{ $post['caption'] }}</p>
