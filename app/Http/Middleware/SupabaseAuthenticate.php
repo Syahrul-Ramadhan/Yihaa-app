@@ -41,7 +41,7 @@ class SupabaseAuthenticate {
       }
     }
     
-    auth()->setUser($user);
+    // auth()->setUser($user);
     return $next($request);
   }
 }
