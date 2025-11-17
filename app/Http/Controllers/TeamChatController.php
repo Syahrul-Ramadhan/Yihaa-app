@@ -9,17 +9,26 @@ class TeamChatController extends Controller
 {
     public function index()
     {
-        $query = <<<'GRAPHQL'
+        $userId = session('user_id');
+
+        if (!$userId) {
+            return redirect()->route('login')->with('error', 'Please login first');
+        }
+
+        // Query teams yang user ikuti (accepted members only)
+        $query = <<<GRAPHQL
         query {
-            teamsCollection {
+            team_membersCollection(filter: { user_id: { eq: $userId }, status: { eq: "accepted" } }) {
                 edges {
                     node {
-                        team_id
-                        team_name
-                        team_desc
-                        team_logo
-                        member_count
-                        member_limit
+                        teams {
+                            team_id
+                            team_name
+                            team_desc
+                            team_logo
+                            member_count
+                            member_limit
+                        }
                     }
                 }
             }
@@ -39,8 +48,8 @@ class TeamChatController extends Controller
             return response()->json(['error' => 'Failed to fetch teams'], 500);
         }
 
-        $edges = $response->json('data.teamsCollection.edges') ?? [];
-        $teams = array_map(fn($edge) => $edge['node'], $edges);
+        $edges = $response->json('data.team_membersCollection.edges') ?? [];
+        $teams = array_map(fn($edge) => $edge['node']['teams'], $edges);
 
         return view('pages.users.messages', [
             'teams' => $teams,
@@ -84,16 +93,18 @@ class TeamChatController extends Controller
             }
         }
 
-        // Query ambil list tim
-        $teamsQuery = <<<'GRAPHQL'
+        // Query ambil list tim yang user ikuti (accepted members only)
+        $teamsQuery = <<<GRAPHQL
         query {
-            teamsCollection {
+            team_membersCollection(filter: { user_id: { eq: $userId }, status: { eq: "accepted" } }) {
                 edges {
                     node {
-                        team_id
-                        team_name
-                        team_desc
-                        team_logo
+                        teams {
+                            team_id
+                            team_name
+                            team_desc
+                            team_logo
+                        }
                     }
                 }
             }
@@ -108,8 +119,8 @@ class TeamChatController extends Controller
             'query' => $teamsQuery
         ]);
 
-        $teamsEdges = $teamsResponse->json('data.teamsCollection.edges') ?? [];
-        $teams = array_map(fn($edge) => $edge['node'], $teamsEdges);
+        $teamsEdges = $teamsResponse->json('data.team_membersCollection.edges') ?? [];
+        $teams = array_map(fn($edge) => $edge['node']['teams'], $teamsEdges);
 
         // Query ambil pesan dari tim tertentu - PENTING: hapus quotes di filter
         $messagesQuery = <<<GRAPHQL
