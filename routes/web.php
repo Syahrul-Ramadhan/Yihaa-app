@@ -21,6 +21,7 @@ Route::post('/register', [AuthController::class, 'register'])->name('register.pr
 // Route::get('/login', [AuthController::class, 'viewLogin'])->name('login');
 Route::view('/', 'pages.users.login')->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.process');
+Route::get('/login-loading', [AuthController::class, 'loginLoading'])->name('login.loading');
 Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
 
 Route::prefix('admin')->name('admin.')->group(base_path('routes/admin.php'));

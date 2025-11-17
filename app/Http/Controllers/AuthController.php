@@ -17,6 +17,11 @@ class AuthController extends Controller
         return view('pages.users.login');
     }
 
+    public function loginLoading()
+    {
+        return view('pages.users.login-loading');
+    }
+
     public function viewRegister()
     {
         return view('pages.users.register');
@@ -178,15 +183,15 @@ class AuthController extends Controller
             ->where('id', session()->getId())
             ->update(['user_id' => $user['id']]);
 
-        return back()->with('login_success', 'Login berhasil! Selamat datang, ' . $user['name']);
-
-
+        // Redirect to loading screen instead of showing modal
+        return redirect()->route('login.loading');
     }
 
     public function logout(Request $request)
     {
         $request->session()->flush(); // hapus semua session
-        return redirect()->route('login')->with('logout_success', 'Berhasil logout!');
+        // Redirect to logout loading screen instead of login with modal
+        return view('pages.users.logout-loading');
     }
 
     public function profile(Request $request)
