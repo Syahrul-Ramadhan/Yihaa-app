@@ -142,11 +142,13 @@ class PostController extends Controller
         $post->caption = $request->input('caption'); // Ambil dari form
         $post->image_url = $imageUrl; // Hasil upload (bisa null)
         
-        // Ganti '1' dengan ID user yang sedang login
-        // Jika sistem login Anda sudah jalan, gunakan Auth::id()
-        $post->uploaded_by = 1;
-        // $post->uploaded_by = Auth::id(); // GUNAKAN INI JIKA SUDAH LOGIN
+        // Ambil user_id dari session
+        $userId = session('user_id');
+        if (!$userId) {
+            return back()->with('error', 'Please login first');
+        }
         
+        $post->uploaded_by = $userId; // User yang sedang login
         $post->created_at = now();
 
         $post->save(); // Model akan mengirim ini ke Supabase
