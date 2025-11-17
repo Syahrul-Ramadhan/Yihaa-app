@@ -16,7 +16,7 @@
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-white">Cari Tim yang Cocok untukmu!</h2>
                 <button 
-                    onclick="document.getElementById('createTeamModal').classList.remove('hidden')"
+                    onclick="document.getElementById('createTeamModal').classList.remove('hidden'); document.getElementById('createTeamModal').classList.add('flex');"
                     class="px-4 py-2 bg-[#2aa3ef] hover:bg-[#2aa3efcc] text-white font-semibold rounded-xl transition cursor-pointer flex items-center gap-2"
                 >
                     <i class="hgi hgi-stroke hgi-add-circle"></i>
@@ -65,11 +65,11 @@
     </div>
 
     <!-- Modal Create Team -->
-    <div id="createTeamModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div id="createTeamModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 items-center justify-center">
         <div class="bg-[#0D1517] rounded-2xl p-6 w-full max-w-md mx-4 border border-[#2aa3ef20]">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-xl font-bold text-white">Create New Team</h3>
-                <button onclick="document.getElementById('createTeamModal').classList.add('hidden')" class="text-gray-400 hover:text-white">
+                <button onclick="document.getElementById('createTeamModal').classList.add('hidden'); document.getElementById('createTeamModal').classList.remove('flex');" class="text-gray-400 hover:text-white">
                     <i class="hgi hgi-stroke hgi-cancel-01 text-2xl"></i>
                 </button>
             </div>

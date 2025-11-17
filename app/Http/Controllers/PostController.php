@@ -138,7 +138,7 @@ class PostController extends Controller
         }
 
         // 4. Simpan data ke database (menggunakan Model)
-        $post = new \App\Models\Post();
+        $post = new Post();
         
         $post->caption = $request->input('caption'); // Ambil dari form
         $post->image_url = $imageUrl ?? ''; // Set empty string jika null (karena NOT NULL constraint)
