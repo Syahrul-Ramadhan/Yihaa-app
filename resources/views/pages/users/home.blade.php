@@ -82,7 +82,7 @@
             <div id="postList" class="space-y-6">
                 <!-- post card -->
                 @foreach ($posts as $post)
-                <div class="bg-[#2aa3ef07] p-6 rounded-2xl shadow-md text-white" x-data="{ dropdownOpen: false }">
+                <div class="bg-[#2aa3ef07] p-6 rounded-2xl shadow-md text-white" x-data="{ dropdownOpen: false, showDeleteModal: false }">
                     <div class="flex items-center justify-between mb-4">
                         <div class="flex items-center">
                             <img src="{{ $post['uploader_avatar']  ?? 'https://qdfotopajdiuailyeprh.supabase.co/storage/v1/object/public/avatars/default-user.jpg' }}" 
@@ -106,15 +106,54 @@
                                  @click.away="dropdownOpen = false"
                                  x-transition
                                  class="absolute right-0 mt-2 w-48 bg-[#1a1a1a] rounded-lg shadow-lg border border-gray-700 z-10">
-                                <form action="{{ route('posts.destroy', $post['post_id']) }}" method="POST" 
-                                      onsubmit="return confirm('Yakin mau hapus postingan ini?')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/20 rounded-lg flex items-center gap-2">
-                                        <i class="hgi hgi-stroke hgi-delete-02"></i>
-                                        Hapus Post
+                                <button @click="showDeleteModal = true; dropdownOpen = false" 
+                                        type="button"
+                                        class="w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/20 rounded-lg flex items-center gap-2">
+                                    <i class="hgi hgi-stroke hgi-delete-02"></i>
+                                    Hapus Post
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- Delete Confirmation Modal --}}
+                        <div x-show="showDeleteModal" 
+                             x-transition
+                             @click.self="showDeleteModal = false"
+                             class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+                            <div class="bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] rounded-2xl p-8 max-w-md w-full mx-4 border border-red-500/30 shadow-2xl"
+                                 @click.stop>
+                                {{-- Icon Warning --}}
+                                <div class="flex justify-center mb-4">
+                                    <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center">
+                                        <i class="hgi hgi-stroke hgi-alert-02 text-4xl text-red-500"></i>
+                                    </div>
+                                </div>
+                                
+                                {{-- Title --}}
+                                <h3 class="text-2xl font-bold text-white text-center mb-2">
+                                    Hapus Postingan?
+                                </h3>
+                                
+                                {{-- Message --}}
+                                <p class="text-gray-400 text-center mb-6">
+                                    Yakin mau hapus postingan ini? Tindakan ini tidak bisa dibatalkan.
+                                </p>
+                                
+                                {{-- Buttons --}}
+                                <div class="flex gap-3">
+                                    <button @click="showDeleteModal = false" 
+                                            class="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition">
+                                        Batal
                                     </button>
-                                </form>
+                                    <form action="{{ route('posts.destroy', $post['post_id']) }}" method="POST" class="flex-1">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" 
+                                                class="w-full px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition">
+                                            Hapus
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
                         </div>
                         @endif

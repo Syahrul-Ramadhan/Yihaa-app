@@ -141,7 +141,7 @@ class PostController extends Controller
         $post = new \App\Models\Post();
         
         $post->caption = $request->input('caption'); // Ambil dari form
-        $post->image_url = $imageUrl; // Hasil upload (bisa null)
+        $post->image_url = $imageUrl ?? ''; // Set empty string jika null (karena NOT NULL constraint)
         
         // Ambil user_id dari session
         $userId = session('user_id');
