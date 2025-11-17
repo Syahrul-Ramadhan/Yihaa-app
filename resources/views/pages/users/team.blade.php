@@ -117,27 +117,28 @@
     </div>
 
     <!-- Modal Create Team -->
-    <div id="createTeamModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 items-center justify-center">
-        <div class="bg-[#0D1517] rounded-2xl p-6 w-full max-w-md mx-4 border border-[#2aa3ef20]">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-white">Create New Team</h3>
-                <button onclick="document.getElementById('createTeamModal').classList.add('hidden'); document.getElementById('createTeamModal').classList.remove('flex');" class="text-gray-400 hover:text-white">
+    <div id="createTeamModal" class="hidden fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm z-50 items-center justify-center p-4">
+        <div class="bg-gradient-to-br from-[#0D1517] to-[#0e1525] rounded-2xl w-full max-w-lg border border-[#2aa3ef40] shadow-2xl">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center px-6 py-4 border-b border-[#2aa3ef20]">
+                <h3 class="text-2xl font-bold text-white">Create New Team</h3>
+                <button onclick="document.getElementById('createTeamModal').classList.add('hidden'); document.getElementById('createTeamModal').classList.remove('flex');" class="text-gray-400 hover:text-white transition">
                     <i class="hgi hgi-stroke hgi-cancel-01 text-2xl"></i>
                 </button>
             </div>
             
             <!-- Modal Form -->
-            <form action="{{ route('teams.store') }}" method="POST" enctype="multipart/form-data" class="bg-[#0e1525] rounded-2xl p-8 max-w-md w-full mx-4">
+            <form action="{{ route('teams.store') }}" method="POST" enctype="multipart/form-data" class="p-6 space-y-5">
                 @csrf
                 
                 <!-- Team Logo Upload -->
-                <div class="mb-5">
-                    <label for="team_logo" class="block text-sm font-medium text-gray-300 mb-2">Team Logo</label>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-300 mb-3">Team Logo</label>
                     <div class="flex items-center gap-4">
-                        <div id="logoPreview" class="bg-[#2aa3ef20] p-4 rounded-xl w-20 h-20 flex items-center justify-center overflow-hidden">
-                            <i class="hgi hgi-stroke hgi-group text-3xl text-[#2aa3ef]"></i>
+                        <div id="logoPreview" class="bg-[#2aa3ef20] rounded-xl w-24 h-24 flex items-center justify-center overflow-hidden border-2 border-[#2aa3ef40]">
+                            <i class="hgi hgi-stroke hgi-group text-4xl text-[#2aa3ef]"></i>
                         </div>
-                        <label for="team_logo" class="px-4 py-2 bg-[#2aa3ef20] hover:bg-[#2aa3ef30] border border-[#2aa3ef] text-[#2aa3ef] rounded-lg cursor-pointer transition">
+                        <label for="team_logo" class="flex-1 px-5 py-3 bg-[#2aa3ef20] hover:bg-[#2aa3ef30] border border-[#2aa3ef] text-[#2aa3ef] rounded-lg cursor-pointer transition text-center font-medium">
                             Choose Image
                             <input type="file" id="team_logo" name="team_logo" accept="image/*" class="hidden">
                         </label>
@@ -145,22 +146,29 @@
                     <p class="text-xs text-gray-400 mt-2">Recommended: Square image, max 2MB</p>
                 </div>
 
+                <!-- Team Name -->
                 <div>
-                    <label class="block text-white mb-2">Team Name</label>
-                    <input type="text" name="team_name" required 
-                        class="w-full bg-[#ffffff0a] border border-[#2aa3ef20] rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#2aa3ef]">
+                    <label class="block text-sm font-semibold text-gray-300 mb-2">Team Name</label>
+                    <input type="text" name="team_name" required placeholder="Enter team name..."
+                        class="w-full bg-[#1A232B] border border-[#2aa3ef40] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#2aa3ef] focus:ring-2 focus:ring-[#2aa3ef20] transition">
                 </div>
+
+                <!-- Description -->
                 <div>
-                    <label class="block text-white mb-2">Description</label>
-                    <textarea name="team_desc" rows="3" 
-                        class="w-full bg-[#ffffff0a] border border-[#2aa3ef20] rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#2aa3ef]"></textarea>
+                    <label class="block text-sm font-semibold text-gray-300 mb-2">Description</label>
+                    <textarea name="team_desc" rows="4" placeholder="Describe your team purpose and goals..."
+                        class="w-full bg-[#1A232B] border border-[#2aa3ef40] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#2aa3ef] focus:ring-2 focus:ring-[#2aa3ef20] transition resize-none"></textarea>
                 </div>
+
+                <!-- Member Limit -->
                 <div>
-                    <label class="block text-white mb-2">Member Limit</label>
+                    <label class="block text-sm font-semibold text-gray-300 mb-2">Member Limit</label>
                     <input type="number" name="member_limit" value="5" min="2" max="50" required
-                        class="w-full bg-[#ffffff0a] border border-[#2aa3ef20] rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#2aa3ef]">
+                        class="w-full bg-[#1A232B] border border-[#2aa3ef40] rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#2aa3ef] focus:ring-2 focus:ring-[#2aa3ef20] transition">
                 </div>
-                <button type="submit" class="w-full py-2 bg-[#2aa3ef] hover:bg-[#2aa3efcc] text-white font-semibold rounded-xl transition">
+
+                <!-- Submit Button -->
+                <button type="submit" class="w-full py-3 bg-gradient-to-r from-[#2aa3ef] to-[#1e8ac9] hover:from-[#1e8ac9] hover:to-[#2aa3ef] text-white font-bold rounded-lg transition shadow-lg shadow-[#2aa3ef30] hover:shadow-[#2aa3ef50]">
                     Create Team
                 </button>
             </form>
