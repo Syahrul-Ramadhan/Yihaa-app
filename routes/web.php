@@ -39,6 +39,7 @@ Route::view('/dashboard', 'dashboard')->name('dashboard');
     // materi
     Route::get('/materi', [MateriController::class, 'index'])->name('materi.index');
     Route::post('/materi', [MateriController::class, 'store'])->name('materi.store');
+    Route::delete('/materi/{id}', [MateriController::class, 'destroy'])->name('materi.destroy');
     Route::get('/notifikasi', [NotifikasiController::class, 'viewNotifikasi'])->name('index');
     // team
     Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');

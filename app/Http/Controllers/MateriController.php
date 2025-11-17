@@ -14,26 +14,26 @@ class MateriController extends Controller
 
     public function index()
     {
-        // Query GraphQL untuk ambil data teams
+        // Query GraphQL untuk ambil data materials
         $query = <<<'GRAPHQL'
         query {
-            materialsCollection {
+            materialsCollection(orderBy: { material_id: DescNullsLast }) {
                 edges {
                     node {
-                    material_id
-                    tittle
-                    description
-                    uploaded_by
-                    file_url
-                    thumbnail_url
-                    users {
-                        name
-                        avatar_url
-                    }
+                        material_id
+                        tittle
+                        description
+                        uploaded_by
+                        file_url
+                        thumbnail_url
+                        users {
+                            name
+                            avatar_url
+                        }
                     }
                 }
             }
-            }
+        }
         GRAPHQL;
 
         $response = Http::withHeaders([
@@ -82,25 +82,33 @@ class MateriController extends Controller
             return back()->with('error', 'Please login first');
         }
 
-        $thumbnailUrl = null;
+        $thumbnailUrl = '';
 
-        // Upload thumbnail to Supabase Storage if provided
+        // Upload thumbnail to Supabase Storage if provided (using 'post-images' bucket)
         if ($request->hasFile('file')) {
             $file = $request->file('file');
+            $bucketName = 'post-images';
             $fileName = 'material_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-            $fileContent = file_get_contents($file->getRealPath());
 
-            // Upload to Supabase Storage
+            // Upload to Supabase Storage using existing 'post-images' bucket
             $uploadResponse = Http::withHeaders([
                 'apikey' => env('SUPABASE_SERVICE_KEY'),
                 'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
-                'Content-Type' => $file->getMimeType(),
-            ])->send('POST', env('SUPABASE_URL') . '/storage/v1/object/materials/' . $fileName, [
-                'body' => $fileContent
-            ]);
+            ])
+            ->withBody(
+                $file->getContent(), 
+                $file->getMimeType()
+            )
+            ->post(env('SUPABASE_URL') . '/storage/v1/object/' . $bucketName . '/' . $fileName);
 
             if ($uploadResponse->successful()) {
-                $thumbnailUrl = env('SUPABASE_URL') . '/storage/v1/object/public/materials/' . $fileName;
+                $thumbnailUrl = env('SUPABASE_URL') . '/storage/v1/object/public/' . $bucketName . '/' . $fileName;
+            } else {
+                \Log::error('Failed to upload material image', [
+                    'response' => $uploadResponse->body(),
+                    'status' => $uploadResponse->status(),
+                ]);
+                return back()->with('error', 'Failed to upload image: ' . $uploadResponse->body());
             }
         }
 
@@ -125,6 +133,15 @@ class MateriController extends Controller
         }
         GRAPHQL;
 
+        // file_url is NOT NULL in database, so use thumbnail or empty string
+        $fileUrl = $thumbnailUrl ?: '';
+
+        // If file_url is empty string, we need to handle it differently
+        // Check if database actually allows empty string for file_url
+        if (empty($fileUrl)) {
+            $fileUrl = 'https://via.placeholder.com/1x1?text=';
+        }
+
         $response = Http::withHeaders([
             'apikey' => env('SUPABASE_SERVICE_KEY'),
             'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
@@ -134,16 +151,102 @@ class MateriController extends Controller
             'variables' => [
                 'tittle' => $request->title,
                 'description' => $request->description,
-                'uploaded_by' => $userId,
+                'uploaded_by' => (int)$userId,
                 'thumbnail_url' => $thumbnailUrl,
-                'file_url' => $thumbnailUrl, // Same as thumbnail for now
+                'file_url' => $fileUrl,
             ],
         ]);
 
         if ($response->failed() || isset($response->json()['errors'])) {
-            return back()->with('error', 'Failed to create material');
+            \Log::error('Material creation failed', [
+                'response' => $response->body(),
+                'status' => $response->status(),
+            ]);
+            return back()->with('error', 'Failed to create material: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'));
         }
 
         return redirect()->route('materi.index')->with('success', 'Material published successfully!');
+    }
+
+    public function destroy($material_id)
+    {
+        $userId = session('user_id');
+        $userRole = session('user_role');
+
+        if (!$userId) {
+            return response()->json(['success' => false, 'message' => 'Please login first'], 401);
+        }
+
+        // Query material untuk validasi ownership
+        $query = <<<'GRAPHQL'
+        query GetMaterial($material_id: BigInt!) {
+            materialsCollection(filter: { material_id: { eq: $material_id } }) {
+                edges {
+                    node {
+                        material_id
+                        uploaded_by
+                        thumbnail_url
+                        file_url
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        $response = Http::withHeaders([
+            'apikey' => env('SUPABASE_ANON_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+            'Content-Type' => 'application/json',
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $query,
+            'variables' => ['material_id' => (int)$material_id],
+        ]);
+
+        $edges = $response->json('data.materialsCollection.edges') ?? [];
+        
+        if (empty($edges)) {
+            return response()->json(['success' => false, 'message' => 'Material not found'], 404);
+        }
+
+        $material = $edges[0]['node'];
+
+        // Validasi: hanya pemilik atau admin yang bisa delete
+        if ($material['uploaded_by'] != $userId && $userRole !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        // Delete material dari database
+        $mutation = <<<'GRAPHQL'
+        mutation DeleteMaterial($material_id: BigInt!) {
+            deleteFrommaterialsCollection(filter: { material_id: { eq: $material_id } }) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        $deleteResponse = Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json',
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $mutation,
+            'variables' => ['material_id' => (int)$material_id],
+        ]);
+
+        if ($deleteResponse->failed() || isset($deleteResponse->json()['errors'])) {
+            return response()->json(['success' => false, 'message' => 'Failed to delete material'], 500);
+        }
+
+        // Delete image dari storage jika ada dan bukan placeholder
+        if (!empty($material['thumbnail_url']) && !str_contains($material['thumbnail_url'], 'placeholder')) {
+            $imagePath = basename(parse_url($material['thumbnail_url'], PHP_URL_PATH));
+            
+            Http::withHeaders([
+                'apikey' => env('SUPABASE_SERVICE_KEY'),
+                'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            ])->delete(env('SUPABASE_URL') . '/storage/v1/object/post-images/' . $imagePath);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Material deleted successfully']);
     }
 }
