@@ -117,8 +117,10 @@
 
                         {{-- Delete Confirmation Modal --}}
                         <div x-show="showDeleteModal" 
+                             x-cloak
                              x-transition
                              @click.self="showDeleteModal = false"
+                             style="display: none;"
                              class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
                             <div class="bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] rounded-2xl p-8 max-w-md w-full mx-4 border border-red-500/30 shadow-2xl"
                                  @click.stop>
