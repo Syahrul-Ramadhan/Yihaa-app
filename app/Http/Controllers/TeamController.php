@@ -399,6 +399,36 @@ class TeamController extends Controller
             }, $pendingEdges);
         }
 
+        // Auto-sync member_count dengan actual members count
+        $actualMemberCount = count($members);
+        if ($team['member_count'] != $actualMemberCount) {
+            $syncMutation = <<<'GRAPHQL'
+            mutation SyncMemberCount($team_id: BigInt!, $actualCount: Int!) {
+                updateteamsCollection(
+                    filter: { team_id: { eq: $team_id } }
+                    set: { member_count: $actualCount }
+                ) {
+                    affectedCount
+                }
+            }
+            GRAPHQL;
+
+            Http::withHeaders([
+                'apikey' => env('SUPABASE_SERVICE_KEY'),
+                'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+                'Content-Type' => 'application/json'
+            ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+                'query' => $syncMutation,
+                'variables' => [
+                    'team_id' => (int) $team_id,
+                    'actualCount' => $actualMemberCount
+                ]
+            ]);
+
+            // Update team array untuk display yang benar
+            $team['member_count'] = $actualMemberCount;
+        }
+
         return view('pages.users.team-detail', compact('team', 'members', 'isMember', 'isPending', 'pendingMembers'));
     }
 
@@ -693,6 +723,30 @@ class TeamController extends Controller
             return back()->with('error', 'Failed to accept member');
         }
 
+        // Increment member_count di teams table
+        $incrementMutation = <<<'GRAPHQL'
+        mutation IncrementMemberCount($team_id: BigInt!, $newCount: Int!) {
+            updateteamsCollection(
+                filter: { team_id: { eq: $team_id } }
+                set: { member_count: $newCount }
+            ) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $incrementMutation,
+            'variables' => [
+                'team_id' => (int) $team_id,
+                'newCount' => $team['member_count'] + 1
+            ]
+        ]);
+
         return back()->with('success', 'Member accepted successfully');
     }
 
@@ -760,6 +814,62 @@ class TeamController extends Controller
         ]);
 
         return back()->with('success', 'Member rejected');
+    }
+
+    public function syncMemberCount($team_id)
+    {
+        // Count actual accepted members
+        $countQuery = <<<'GRAPHQL'
+        query CountMembers($team_id: BigInt!) {
+            team_membersCollection(filter: { team_id: { eq: $team_id }, status: { eq: "accepted" } }) {
+                edges {
+                    node {
+                        member_id
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        $countResponse = Http::withHeaders([
+            'apikey' => env('SUPABASE_ANON_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $countQuery,
+            'variables' => [
+                'team_id' => (int) $team_id
+            ]
+        ]);
+
+        $edges = $countResponse->json('data.team_membersCollection.edges') ?? [];
+        $actualCount = count($edges);
+
+        // Update teams.member_count
+        $updateMutation = <<<'GRAPHQL'
+        mutation UpdateMemberCount($team_id: BigInt!, $actualCount: Int!) {
+            updateteamsCollection(
+                filter: { team_id: { eq: $team_id } }
+                set: { member_count: $actualCount }
+            ) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $updateMutation,
+            'variables' => [
+                'team_id' => (int) $team_id,
+                'actualCount' => $actualCount
+            ]
+        ]);
+
+        return back()->with('success', "Member count synced: $actualCount members");
     }
 
     // public function viewTeam()

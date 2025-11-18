@@ -236,6 +236,30 @@ class NotifikasiController extends Controller
             return back()->with('error', 'Failed to accept team request');
         }
 
+        // Increment member_count di teams table
+        $incrementMutation = <<<'GRAPHQL'
+        mutation IncrementMemberCount($teamId: BigInt!, $newCount: Int!) {
+            updateteamsCollection(
+                filter: { team_id: { eq: $teamId } }
+                set: { member_count: $newCount }
+            ) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $incrementMutation,
+            'variables' => [
+                'teamId' => (int) $teamId,
+                'newCount' => $team['member_count'] + 1
+            ]
+        ]);
+
         // Mark notification as read
         $this->markAsRead($notificationId);
 
