@@ -40,6 +40,12 @@
                         
                         @if($team['leader_id'] == session('user_id'))
                             <button 
+                                onclick="showEditTeamModal()"
+                                class="px-6 py-3 bg-[#2aa3ef] hover:bg-[#2aa3efcc] text-white font-semibold rounded-xl transition">
+                                <i class="hgi hgi-stroke hgi-pencil-edit-02 mr-2"></i>
+                                Edit Team
+                            </button>
+                            <button 
                                 onclick="document.getElementById('deleteTeamModal').classList.remove('hidden')"
                                 class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition">
                                 <i class="hgi hgi-stroke hgi-delete-02 mr-2"></i>
@@ -52,13 +58,22 @@
                             Request Pending
                         </button>
                     @else
-                        <form action="{{ route('teams.join', $team['team_id']) }}" method="POST">
-                            @csrf
-                            <button type="submit" class="px-6 py-3 bg-[#2aa3ef] hover:bg-[#2aa3efcc] text-white font-semibold rounded-xl transition">
-                                <i class="hgi hgi-stroke hgi-user-add-01 mr-2"></i>
-                                Join Team
+                        @if($team['member_count'] >= $team['member_limit'])
+                            <button 
+                                onclick="showTeamFullModal()"
+                                class="px-6 py-3 bg-gray-600 text-gray-300 font-semibold rounded-xl">
+                                <i class="hgi hgi-stroke hgi-lock-02 mr-2"></i>
+                                Team Full
                             </button>
-                        </form>
+                        @else
+                            <form action="{{ route('teams.join', $team['team_id']) }}" method="POST">
+                                @csrf
+                                <button type="submit" class="px-6 py-3 bg-[#2aa3ef] hover:bg-[#2aa3efcc] text-white font-semibold rounded-xl transition">
+                                    <i class="hgi hgi-stroke hgi-user-add-01 mr-2"></i>
+                                    Join Team
+                                </button>
+                            </form>
+                        @endif
                     @endif
                 </div>
             </div>
@@ -251,6 +266,95 @@
     </div>
 </div>
 
+<!-- Team Full Modal -->
+<div id="teamFullModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-[#0D1517] rounded-2xl p-6 w-full max-w-md border border-yellow-500/30 transform scale-100 animate-[slideUp_0.3s_ease-out]">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-12 h-12 bg-yellow-500/20 rounded-full flex items-center justify-center">
+                    <i class="hgi hgi-stroke hgi-lock-02 text-2xl text-yellow-500"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white">Team Full</h3>
+            </div>
+            
+            <p class="text-gray-300 mb-6">
+                This team has reached its maximum member capacity. You cannot send a join request at this time. Please try again when a spot becomes available.
+            </p>
+            
+            <button 
+                onclick="closeTeamFullModal()"
+                class="w-full px-4 py-3 bg-[#2aa3ef] hover:bg-[#2aa3efcc] text-white font-semibold rounded-lg transition">
+                Understood
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Team Modal -->
+<div id="editTeamModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-[#0D1517] rounded-2xl p-6 w-full max-w-2xl border border-[#2aa3ef30] transform scale-100 animate-[slideUp_0.3s_ease-out]">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-12 h-12 bg-[#2aa3ef]/20 rounded-full flex items-center justify-center">
+                    <i class="hgi hgi-stroke hgi-pencil-edit-02 text-2xl text-[#2aa3ef]"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white">Edit Team</h3>
+            </div>
+            
+            <form action="{{ route('teams.update', $team['team_id']) }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                @method('PUT')
+                
+                <!-- Team Name (Read Only) -->
+                <div class="mb-4">
+                    <label class="block text-gray-300 mb-2 font-semibold">Team Name</label>
+                    <input type="text" value="{{ $team['team_name'] }}" disabled 
+                        class="w-full px-4 py-3 bg-gray-700 text-gray-400 rounded-lg cursor-not-allowed">
+                    <p class="text-xs text-gray-500 mt-1">Team name cannot be changed</p>
+                </div>
+                
+                <!-- Team Description -->
+                <div class="mb-4">
+                    <label class="block text-gray-300 mb-2 font-semibold">Team Description</label>
+                    <textarea name="team_desc" rows="4" 
+                        class="w-full px-4 py-3 bg-[#1a1f23] border border-gray-700 text-white rounded-lg focus:border-[#2aa3ef] focus:outline-none"
+                        placeholder="Enter team description...">{{ $team['team_desc'] }}</textarea>
+                </div>
+                
+                <!-- Team Logo URL -->
+                <div class="mb-4">
+                    <label class="block text-gray-300 mb-2 font-semibold">Team Logo URL</label>
+                    <input type="url" name="team_logo" value="{{ $team['team_logo'] }}" 
+                        class="w-full px-4 py-3 bg-[#1a1f23] border border-gray-700 text-white rounded-lg focus:border-[#2aa3ef] focus:outline-none"
+                        placeholder="https://example.com/logo.png">
+                    <p class="text-xs text-gray-500 mt-1">Enter a valid image URL for team logo</p>
+                </div>
+                
+                <!-- Member Limit -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 mb-2 font-semibold">Member Limit</label>
+                    <input type="number" name="member_limit" value="{{ $team['member_limit'] }}" 
+                        min="{{ $team['member_count'] }}" max="20"
+                        class="w-full px-4 py-3 bg-[#1a1f23] border border-gray-700 text-white rounded-lg focus:border-[#2aa3ef] focus:outline-none">
+                    <p class="text-xs text-gray-500 mt-1">Current members: {{ $team['member_count'] }}. Cannot set limit below current member count.</p>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button 
+                        type="button"
+                        onclick="closeEditTeamModal()"
+                        class="flex-1 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 px-4 py-3 bg-[#2aa3ef] hover:bg-[#2aa3efcc] text-white font-semibold rounded-lg transition">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 function showKickModal(userId, userName) {
     const modal = document.getElementById('kickMemberModal');
@@ -269,6 +373,22 @@ function showKickModal(userId, userName) {
 
 function closeKickModal() {
     document.getElementById('kickMemberModal').classList.add('hidden');
+}
+
+function showTeamFullModal() {
+    document.getElementById('teamFullModal').classList.remove('hidden');
+}
+
+function closeTeamFullModal() {
+    document.getElementById('teamFullModal').classList.add('hidden');
+}
+
+function showEditTeamModal() {
+    document.getElementById('editTeamModal').classList.remove('hidden');
+}
+
+function closeEditTeamModal() {
+    document.getElementById('editTeamModal').classList.add('hidden');
 }
 </script>
 @endsection

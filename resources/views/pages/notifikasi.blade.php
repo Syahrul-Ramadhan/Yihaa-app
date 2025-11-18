@@ -57,9 +57,12 @@
                                     @elseif($notif['type'] === 'team_join_request')
                                         <i class="hgi hgi-stroke hgi-user-add-01 text-green-400 mr-1"></i>
                                         <span class="font-semibold text-[#2aa3ef]">{{ $notif['users']['name'] ?? 'Someone' }}</span> wants to join your team
-                                    @elseif($notif['type'] === 'team_accepted')
+                                    @elseif($notif['type'] === 'team_accept')
                                         <i class="hgi hgi-stroke hgi-checkmark-circle-02 text-green-400 mr-1"></i>
-                                        Your request to join <span class="font-semibold text-[#2aa3ef]">{{ $notif['teams']['team_name'] ?? 'a team' }}</span> has been accepted
+                                        Your request to join a team has been accepted!
+                                    @elseif($notif['type'] === 'team_kick')
+                                        <i class="hgi hgi-stroke hgi-user-remove-02 text-red-400 mr-1"></i>
+                                        You have been removed from a team
                                     @else
                                         {{ $notif['message'] }}
                                     @endif

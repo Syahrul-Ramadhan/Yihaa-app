@@ -253,6 +253,99 @@ class TeamController extends Controller
         return redirect()->route('teams.index')->with('success', 'Team created successfully!');
     }
 
+    public function update(Request $request, $team_id)
+    {
+        $request->validate([
+            'team_desc' => 'nullable|string',
+            'team_logo' => 'nullable|url',
+            'member_limit' => 'required|integer|min:1|max:20',
+        ]);
+
+        $userId = session('user_id');
+        if (!$userId) {
+            return back()->with('error', 'Please login first');
+        }
+
+        // Verify user is team leader and get current member count
+        $checkQuery = <<<'GRAPHQL'
+        query CheckLeader($team_id: BigInt!, $userId: BigInt!) {
+            teamsCollection(filter: { team_id: { eq: $team_id }, leader_id: { eq: $userId } }) {
+                edges {
+                    node {
+                        team_id
+                        member_count
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        $checkResponse = Http::withHeaders([
+            'apikey' => env('SUPABASE_ANON_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $checkQuery,
+            'variables' => [
+                'team_id' => (int) $team_id,
+                'userId' => (int) $userId
+            ]
+        ]);
+
+        $teamEdges = $checkResponse->json('data.teamsCollection.edges');
+        if (empty($teamEdges)) {
+            return back()->with('error', 'Only team leader can edit team');
+        }
+
+        $team = $teamEdges[0]['node'];
+
+        // Validate that new limit is not less than current member count
+        if ($request->member_limit < $team['member_count']) {
+            return back()->with('error', 'Cannot set member limit below current member count (' . $team['member_count'] . ')');
+        }
+
+        // Determine new status based on new limit
+        $newStatus = ($team['member_count'] >= $request->member_limit) ? 'closed' : 'open';
+
+        // Update team
+        $mutation = <<<'GRAPHQL'
+        mutation UpdateTeam($team_id: BigInt!, $team_desc: String, $team_logo: String, $member_limit: Int!, $team_status: String!) {
+            updateteamsCollection(
+                filter: { team_id: { eq: $team_id } }
+                set: { 
+                    team_desc: $team_desc,
+                    team_logo: $team_logo,
+                    member_limit: $member_limit,
+                    team_status: $team_status
+                }
+            ) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        $response = Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $mutation,
+            'variables' => [
+                'team_id' => (int) $team_id,
+                'team_desc' => $request->team_desc,
+                'team_logo' => $request->team_logo,
+                'member_limit' => (int) $request->member_limit,
+                'team_status' => $newStatus
+            ]
+        ]);
+
+        if ($response->failed() || isset($response->json()['errors'])) {
+            return back()->with('error', 'Failed to update team');
+        }
+
+        return back()->with('success', 'Team updated successfully!');
+    }
+
     public function show($team_id)
     {
         $userId = session('user_id');
@@ -402,11 +495,13 @@ class TeamController extends Controller
         // Auto-sync member_count dengan actual members count
         $actualMemberCount = count($members);
         if ($team['member_count'] != $actualMemberCount) {
+            $newStatus = ($actualMemberCount >= $team['member_limit']) ? 'closed' : 'open';
+            
             $syncMutation = <<<'GRAPHQL'
-            mutation SyncMemberCount($team_id: BigInt!, $actualCount: Int!) {
+            mutation SyncMemberCount($team_id: BigInt!, $actualCount: Int!, $newStatus: String!) {
                 updateteamsCollection(
                     filter: { team_id: { eq: $team_id } }
-                    set: { member_count: $actualCount }
+                    set: { member_count: $actualCount, team_status: $newStatus }
                 ) {
                     affectedCount
                 }
@@ -421,12 +516,14 @@ class TeamController extends Controller
                 'query' => $syncMutation,
                 'variables' => [
                     'team_id' => (int) $team_id,
-                    'actualCount' => $actualMemberCount
+                    'actualCount' => $actualMemberCount,
+                    'newStatus' => $newStatus
                 ]
             ]);
-
-            // Update team array untuk display yang benar
+            
+            // Update local team data with synced values
             $team['member_count'] = $actualMemberCount;
+            $team['team_status'] = $newStatus;
         }
 
         return view('pages.users.team-detail', compact('team', 'members', 'isMember', 'isPending', 'pendingMembers'));
@@ -439,7 +536,7 @@ class TeamController extends Controller
             return back()->with('error', 'Please login first');
         }
 
-        // Get team leader
+        // Get team details including member count and limit
         $teamQuery = <<<'GRAPHQL'
         query GetTeamForJoin($team_id: BigInt!) {
             teamsCollection(filter: { team_id: { eq: $team_id } }) {
@@ -447,6 +544,8 @@ class TeamController extends Controller
                     node {
                         leader_id
                         team_name
+                        member_count
+                        member_limit
                     }
                 }
             }
@@ -467,6 +566,11 @@ class TeamController extends Controller
             return back()->with('error', 'Team not found');
         }
         $team = $teamEdges[0]['node'];
+
+        // Check if team is full
+        if ($team['member_count'] >= $team['member_limit']) {
+            return back()->with('error', 'Team is full! Cannot send join request.');
+        }
 
         // Insert join request
         $mutation = <<<'GRAPHQL'
@@ -659,6 +763,7 @@ class TeamController extends Controller
                 edges {
                     node {
                         team_id
+                        team_name
                         member_count
                         member_limit
                     }
@@ -724,11 +829,14 @@ class TeamController extends Controller
         }
 
         // Increment member_count di teams table
+        $newCount = $team['member_count'] + 1;
+        $newStatus = ($newCount >= $team['member_limit']) ? 'closed' : 'open';
+        
         $incrementMutation = <<<'GRAPHQL'
-        mutation IncrementMemberCount($team_id: BigInt!, $newCount: Int!) {
+        mutation IncrementMemberCount($team_id: BigInt!, $newCount: Int!, $newStatus: String!) {
             updateteamsCollection(
                 filter: { team_id: { eq: $team_id } }
-                set: { member_count: $newCount }
+                set: { member_count: $newCount, team_status: $newStatus }
             ) {
                 affectedCount
             }
@@ -743,8 +851,42 @@ class TeamController extends Controller
             'query' => $incrementMutation,
             'variables' => [
                 'team_id' => (int) $team_id,
-                'newCount' => $team['member_count'] + 1
+                'newCount' => $newCount,
+                'newStatus' => $newStatus
             ]
+        ]);
+
+        // Send notification to accepted user
+        $leaderName = session('user_name');
+        $notifMutation = <<<'GRAPHQL'
+        mutation InsertNotification($user_id: BigInt!, $from_user_id: BigInt!, $team_id: BigInt!, $message: String!) {
+            insertIntonotificationsCollection(
+                objects: {
+                    user_id: $user_id,
+                    from_user_id: $from_user_id,
+                    team_id: $team_id,
+                    type: "team_accept",
+                    message: $message,
+                    is_read: false
+                }
+            ) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json',
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $notifMutation,
+            'variables' => [
+                'user_id' => (int) $user_id,
+                'from_user_id' => (int) $leaderId,
+                'team_id' => (int) $team_id,
+                'message' => "Your request to join {$team['team_name']} has been accepted!",
+            ],
         ]);
 
         return back()->with('success', 'Member accepted successfully');
@@ -886,6 +1028,7 @@ class TeamController extends Controller
                 edges {
                     node {
                         team_id
+                        team_name
                         member_count
                     }
                 }
@@ -948,12 +1091,15 @@ class TeamController extends Controller
             return back()->with('error', 'Failed to kick member');
         }
 
-        // Auto-decrement member_count
+        // Auto-decrement member_count and update status
+        $newCount = max(1, $team['member_count'] - 1);
+        $newStatus = 'open'; // Always open after kicking since space is now available
+        
         $decrementMutation = <<<'GRAPHQL'
-        mutation DecrementMemberCount($team_id: BigInt!, $newCount: Int!) {
+        mutation DecrementMemberCount($team_id: BigInt!, $newCount: Int!, $newStatus: String!) {
             updateteamsCollection(
                 filter: { team_id: { eq: $team_id } }
-                set: { member_count: $newCount }
+                set: { member_count: $newCount, team_status: $newStatus }
             ) {
                 affectedCount
             }
@@ -968,8 +1114,42 @@ class TeamController extends Controller
             'query' => $decrementMutation,
             'variables' => [
                 'team_id' => (int) $team_id,
-                'newCount' => max(1, $team['member_count'] - 1) // Minimum 1 (leader)
+                'newCount' => $newCount,
+                'newStatus' => $newStatus
             ]
+        ]);
+
+        // Send notification to kicked user
+        $leaderName = session('user_name');
+        $notifMutation = <<<'GRAPHQL'
+        mutation InsertNotification($user_id: BigInt!, $from_user_id: BigInt!, $team_id: BigInt!, $message: String!) {
+            insertIntonotificationsCollection(
+                objects: {
+                    user_id: $user_id,
+                    from_user_id: $from_user_id,
+                    team_id: $team_id,
+                    type: "team_kick",
+                    message: $message,
+                    is_read: false
+                }
+            ) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json',
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $notifMutation,
+            'variables' => [
+                'user_id' => (int) $user_id,
+                'from_user_id' => (int) $leaderId,
+                'team_id' => (int) $team_id,
+                'message' => "You have been removed from the team: {$team['team_name']}",
+            ],
         ]);
 
         return back()->with('success', 'Member kicked successfully');

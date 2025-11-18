@@ -139,12 +139,13 @@ class NotifikasiController extends Controller
 
     public function acceptTeamRequest($notificationId, $teamId)
     {
-        // Check team member limit first
+        // Check team member limit first and get team name
         $teamQuery = <<<'GRAPHQL'
         query GetTeamLimit($teamId: BigInt!) {
             teamsCollection(filter: { team_id: { eq: $teamId } }) {
                 edges {
                     node {
+                        team_name
                         member_count
                         member_limit
                     }
@@ -236,12 +237,15 @@ class NotifikasiController extends Controller
             return back()->with('error', 'Failed to accept team request');
         }
 
-        // Increment member_count di teams table
+        // Increment member_count and update status di teams table
+        $newCount = $team['member_count'] + 1;
+        $newStatus = ($newCount >= $team['member_limit']) ? 'closed' : 'open';
+        
         $incrementMutation = <<<'GRAPHQL'
-        mutation IncrementMemberCount($teamId: BigInt!, $newCount: Int!) {
+        mutation IncrementMemberCount($teamId: BigInt!, $newCount: Int!, $newStatus: String!) {
             updateteamsCollection(
                 filter: { team_id: { eq: $teamId } }
-                set: { member_count: $newCount }
+                set: { member_count: $newCount, team_status: $newStatus }
             ) {
                 affectedCount
             }
@@ -256,8 +260,42 @@ class NotifikasiController extends Controller
             'query' => $incrementMutation,
             'variables' => [
                 'teamId' => (int) $teamId,
-                'newCount' => $team['member_count'] + 1
+                'newCount' => $newCount,
+                'newStatus' => $newStatus
             ]
+        ]);
+
+        // Send notification to accepted user
+        $leaderId = session('user_id');
+        $notifMutation = <<<'GRAPHQL'
+        mutation InsertNotification($user_id: BigInt!, $from_user_id: BigInt!, $team_id: BigInt!, $message: String!) {
+            insertIntonotificationsCollection(
+                objects: {
+                    user_id: $user_id,
+                    from_user_id: $from_user_id,
+                    team_id: $team_id,
+                    type: "team_accept",
+                    message: $message,
+                    is_read: false
+                }
+            ) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json',
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $notifMutation,
+            'variables' => [
+                'user_id' => (int) $fromUserId,
+                'from_user_id' => (int) $leaderId,
+                'team_id' => (int) $teamId,
+                'message' => "Your request to join {$team['team_name']} has been accepted!",
+            ],
         ]);
 
         // Mark notification as read
