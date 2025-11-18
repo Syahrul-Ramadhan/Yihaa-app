@@ -23,9 +23,15 @@
             <div class="flex-1">
                 <div class="flex items-center gap-3 mb-2">
                     <h1 class="text-3xl font-bold text-white">{{ $team['team_name'] }}</h1>
-                    <span class="px-3 py-1 bg-[#2aa3ef20] text-[#2aa3ef] rounded-full text-sm">
-                        {{ ucfirst($team['team_status']) }}
-                    </span>
+                    @if($team['team_status'] === 'closed')
+                        <span class="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm">
+                            Closed
+                        </span>
+                    @else
+                        <span class="px-3 py-1 bg-[#2aa3ef20] text-[#2aa3ef] rounded-full text-sm">
+                            Open
+                        </span>
+                    @endif
                 </div>
                 <p class="text-gray-400 mb-4">{{ $team['member_count'] }}/{{ $team['member_limit'] }} Members</p>
                 
