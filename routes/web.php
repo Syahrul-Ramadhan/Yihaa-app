@@ -41,7 +41,8 @@ Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::get('/materi', [MateriController::class, 'index'])->name('materi.index');
     Route::post('/materi', [MateriController::class, 'store'])->name('materi.store');
     Route::delete('/materi/{id}', [MateriController::class, 'destroy'])->name('materi.destroy');
-    Route::get('/notifikasi', [NotifikasiController::class, 'viewNotifikasi'])->name('index');
+    // notifikasi
+    Route::prefix('notifikasi')->name('notifikasi.')->group(base_path('routes/notifikasi.php'));
     // team
     Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
     Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
