@@ -88,13 +88,21 @@
                             <p class="text-sm text-gray-400">{{ ucfirst($member['role']) }}</p>
                         </div>
                     </div>
-                    @if($member['role'] === 'leader')
-                        <span class="px-3 py-1 bg-yellow-500/20 text-yellow-500 rounded-full text-xs">Leader</span>
-                    @endif
+                    <div class="flex items-center gap-2">
+                        @if($member['role'] === 'leader')
+                            <span class="px-3 py-1 bg-yellow-500/20 text-yellow-500 rounded-full text-xs">Leader</span>
+                        @elseif($team['leader_id'] == session('user_id') && $member['user_id'] != session('user_id'))
+                            <button 
+                                onclick="showKickModal('{{ $member['user_id'] }}', '{{ $member['name'] }}')"
+                                class="px-3 py-1 bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-lg text-xs transition" 
+                                title="Kick member">
+                                <i class="hgi hgi-stroke hgi-user-remove-02"></i>
+                                Kick
+                            </button>
+                        @endif
+                    </div>
                 </div>
-            @empty
-                <p class="text-gray-400 text-center py-4">No members yet</p>
-            @endforelse
+            @endforeach
         </div>
     </div>
 
@@ -209,4 +217,58 @@
     </div>
     </div>
 </div>
+
+<!-- Kick Member Modal -->
+<div id="kickMemberModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-[#0D1517] rounded-2xl p-6 w-full max-w-md border border-red-500/30 transform scale-100 animate-[slideUp_0.3s_ease-out]">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
+                    <i class="hgi hgi-stroke hgi-user-remove-02 text-2xl text-red-500"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white">Kick Member</h3>
+            </div>
+            
+            <p class="text-gray-300 mb-6">
+                Are you sure you want to kick <span id="kickMemberName" class="font-semibold text-white"></span> from the team?
+            </p>
+            
+            <div class="flex gap-3">
+                <button 
+                    onclick="closeKickModal()"
+                    class="flex-1 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition">
+                    Cancel
+                </button>
+                <form id="kickMemberForm" method="POST" class="flex-1">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition">
+                        Kick Member
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showKickModal(userId, userName) {
+    const modal = document.getElementById('kickMemberModal');
+    const form = document.getElementById('kickMemberForm');
+    const nameSpan = document.getElementById('kickMemberName');
+    
+    // Set form action
+    form.action = `/teams/{{ $team['team_id'] }}/kick/${userId}`;
+    
+    // Set member name
+    nameSpan.textContent = userName;
+    
+    // Show modal
+    modal.classList.remove('hidden');
+}
+
+function closeKickModal() {
+    document.getElementById('kickMemberModal').classList.add('hidden');
+}
+</script>
 @endsection

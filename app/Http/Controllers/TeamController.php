@@ -872,6 +872,109 @@ class TeamController extends Controller
         return back()->with('success', "Member count synced: $actualCount members");
     }
 
+    public function kickMember($team_id, $user_id)
+    {
+        $leaderId = session('user_id');
+        if (!$leaderId) {
+            return back()->with('error', 'Please login first');
+        }
+
+        // Verify user is team leader
+        $checkQuery = <<<'GRAPHQL'
+        query CheckLeader($team_id: BigInt!, $leaderId: BigInt!) {
+            teamsCollection(filter: { team_id: { eq: $team_id }, leader_id: { eq: $leaderId } }) {
+                edges {
+                    node {
+                        team_id
+                        member_count
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        $checkResponse = Http::withHeaders([
+            'apikey' => env('SUPABASE_ANON_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $checkQuery,
+            'variables' => [
+                'team_id' => (int) $team_id,
+                'leaderId' => (int) $leaderId
+            ]
+        ]);
+
+        $teamEdges = $checkResponse->json('data.teamsCollection.edges');
+        if (empty($teamEdges)) {
+            return back()->with('error', 'Only team leader can kick members');
+        }
+
+        $team = $teamEdges[0]['node'];
+
+        // Prevent kicking self (leader)
+        if ((int) $user_id === (int) $leaderId) {
+            return back()->with('error', 'You cannot kick yourself');
+        }
+
+        // Delete member from team_members
+        $mutation = <<<'GRAPHQL'
+        mutation KickMember($team_id: BigInt!, $user_id: BigInt!) {
+            deleteFromteam_membersCollection(
+                filter: { 
+                    team_id: { eq: $team_id }
+                    user_id: { eq: $user_id }
+                    status: { eq: "accepted" }
+                }
+            ) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        $response = Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $mutation,
+            'variables' => [
+                'team_id' => (int) $team_id,
+                'user_id' => (int) $user_id
+            ]
+        ]);
+
+        if ($response->failed() || isset($response->json()['errors'])) {
+            return back()->with('error', 'Failed to kick member');
+        }
+
+        // Auto-decrement member_count
+        $decrementMutation = <<<'GRAPHQL'
+        mutation DecrementMemberCount($team_id: BigInt!, $newCount: Int!) {
+            updateteamsCollection(
+                filter: { team_id: { eq: $team_id } }
+                set: { member_count: $newCount }
+            ) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $decrementMutation,
+            'variables' => [
+                'team_id' => (int) $team_id,
+                'newCount' => max(1, $team['member_count'] - 1) // Minimum 1 (leader)
+            ]
+        ]);
+
+        return back()->with('success', 'Member kicked successfully');
+    }
+
     // public function viewTeam()
     // {
     //     return view('pages.users.team');
