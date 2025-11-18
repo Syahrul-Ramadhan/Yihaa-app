@@ -85,7 +85,10 @@ class MateriController extends Controller
         ];
     });
 
-        return view('pages.materi', compact('materials'));
+        // Get team recommendations
+        $teams = \App\Http\Controllers\TeamController::getTeamRecommendations(20);
+
+        return view('pages.materi', compact('materials', 'teams'));
     }
 
     public function store(Request $request)

@@ -93,7 +93,10 @@ class PostController extends Controller
             ];
         });
 
-        return view('pages.users.home', compact('posts'));
+        // Get team recommendations
+        $teams = \App\Http\Controllers\TeamController::getTeamRecommendations(20);
+
+        return view('pages.users.home', compact('posts', 'teams'));
     }
 
     public function store(Request $request)

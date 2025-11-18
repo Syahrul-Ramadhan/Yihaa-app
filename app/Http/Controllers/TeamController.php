@@ -1155,6 +1155,49 @@ class TeamController extends Controller
         return back()->with('success', 'Member kicked successfully');
     }
 
+    /**
+     * Static helper method to fetch team recommendations
+     * Can be called from any controller
+     */
+    public static function getTeamRecommendations($limit = 10)
+    {
+        $query = <<<'GRAPHQL'
+        query GetTeams($limit: Int!) {
+            teamsCollection(
+                first: $limit
+                orderBy: [{ member_count: DescNullsLast }]
+            ) {
+                edges {
+                    node {
+                        team_id
+                        team_name
+                        team_logo
+                        team_status
+                        member_count
+                        member_limit
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        $response = Http::withHeaders([
+            'apikey' => env('SUPABASE_ANON_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $query,
+            'variables' => ['limit' => $limit]
+        ]);
+
+        if ($response->failed()) {
+            return [];
+        }
+
+        $edges = $response->json('data.teamsCollection.edges') ?? [];
+        return array_map(fn($edge) => $edge['node'], $edges);
+    }
+
     // public function viewTeam()
     // {
     //     return view('pages.users.team');

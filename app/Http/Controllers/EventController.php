@@ -51,7 +51,10 @@ class EventController extends Controller
         $edges = $response->json('data.seminarCollection.edges') ?? [];
         $seminars = array_map(fn($edge) => $edge['node'], $edges);
 
-        return view('pages.events.seminar', compact('seminars'));
+        // Get team recommendations
+        $teams = \App\Http\Controllers\TeamController::getTeamRecommendations(20);
+
+        return view('pages.events.seminar', compact('seminars', 'teams'));
     }
 
     /**
@@ -95,7 +98,10 @@ class EventController extends Controller
         $edges = $response->json('data.beasiswaCollection.edges') ?? [];
         $beasiswas = array_map(fn($edge) => $edge['node'], $edges);
 
-        return view('pages.events.beasiswa', compact('beasiswas'));
+        // Get team recommendations
+        $teams = \App\Http\Controllers\TeamController::getTeamRecommendations(20);
+
+        return view('pages.events.beasiswa', compact('beasiswas', 'teams'));
     }
 
     /**
@@ -140,6 +146,9 @@ class EventController extends Controller
         $edges = $response->json('data.lombaCollection.edges') ?? [];
         $lombas = array_map(fn($edge) => $edge['node'], $edges);
 
-        return view('pages.events.lomba', compact('lombas'));
+        // Get team recommendations
+        $teams = \App\Http\Controllers\TeamController::getTeamRecommendations(20);
+
+        return view('pages.events.lomba', compact('lombas', 'teams'));
     }
 }
