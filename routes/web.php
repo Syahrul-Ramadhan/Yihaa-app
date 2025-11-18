@@ -9,6 +9,7 @@ use App\Http\Controllers\TeamChatController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\NotifikasiController;
+use App\Http\Controllers\ProfileController;
 
 Route::view('/forgot-password', 'pages.users.forgot-password')->name('forgot');
 Route::view('/reset-password', 'pages.users.reset-password')->name('reset');
@@ -57,5 +58,7 @@ Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::get('/chat/{team_id}', [TeamChatController::class, 'show'])->name('chat.show');
     Route::post('/chat/{team_id}/send', [TeamChatController::class, 'sendMessage'])->name('chat.send');
     // profile
-    Route::get('/profile', [AuthController::class, 'profile'])->name('profile');
+    Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+    Route::get('/profile/edit', [ProfileController::class, 'showEdit'])->name('profile.edit');
+    Route::post('/profile/update', [ProfileController::class, 'update'])->name('profile.update');
 
