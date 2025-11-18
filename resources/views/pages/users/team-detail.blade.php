@@ -74,7 +74,7 @@
     </div>
 
     <!-- Team Members -->
-    <div class="bg-[#ffffff0a] rounded-2xl p-6 border border-[#2aa3ef20]">
+    <div class="bg-[#ffffff0a] rounded-2xl p-6 border border-[#2aa3ef20] mb-6">
         <h2 class="text-xl font-bold text-white mb-4">Team Members ({{ count($members) }})</h2>
         <div class="space-y-3">
             @forelse($members as $member)
@@ -97,12 +97,84 @@
             @endforelse
         </div>
     </div>
+
+    <!-- Pending Invites (Only for Leader) -->
+    @if($team['leader_id'] == session('user_id') && count($pendingMembers) > 0)
+    <div class="bg-[#ffffff0a] rounded-2xl p-6 border border-yellow-500/20 mb-6">
+        <h2 class="text-xl font-bold text-white mb-4">
+            <i class="hgi hgi-stroke hgi-time-02 text-yellow-500 mr-2"></i>
+            Pending Join Requests ({{ count($pendingMembers) }})
+        </h2>
+        <div class="space-y-3">
+            @foreach($pendingMembers as $pending)
+                <div class="flex items-center justify-between p-3 bg-[#ffffff05] rounded-lg">
+                    <div class="flex items-center gap-3">
+                        <img src="{{ $pending['avatar_url'] ?? 'https://qdfotopajdiuailyeprh.supabase.co/storage/v1/object/public/avatars/default-user.jpg' }}" 
+                            alt="{{ $pending['name'] }}" 
+                            class="w-10 h-10 rounded-full object-cover">
+                        <div>
+                            <p class="text-white font-semibold">{{ $pending['name'] }}</p>
+                            <p class="text-sm text-yellow-400">Waiting for approval</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <form action="{{ route('teams.acceptMember', [$team['team_id'], $pending['user_id']]) }}" method="POST">
+                            @csrf
+                            <button type="submit" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-lg transition">
+                                <i class="hgi hgi-stroke hgi-checkmark-circle-02 mr-1"></i>
+                                Accept
+                            </button>
+                        </form>
+                        <form action="{{ route('teams.rejectMember', [$team['team_id'], $pending['user_id']]) }}" method="POST">
+                            @csrf
+                            <button type="submit" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-lg transition">
+                                <i class="hgi hgi-stroke hgi-cancel-01 mr-1"></i>
+                                Decline
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
 </div>
 
-@if(session('success'))
-    <script>
-        alert('{{ session('success') }}');
-    </script>
+<!-- Success/Error Modal -->
+@if(session('success') || session('error'))
+<div id="alertModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-[#0D1517] rounded-2xl p-6 w-full max-w-md border {{ session('success') ? 'border-green-500/30' : 'border-red-500/30' }} transform scale-100 animate-[slideUp_0.3s_ease-out]">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 {{ session('success') ? 'bg-green-500/20' : 'bg-red-500/20' }} rounded-full flex items-center justify-center">
+                <i class="hgi hgi-stroke {{ session('success') ? 'hgi-checkmark-circle-02 text-green-500' : 'hgi-alert-02 text-red-500' }} text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white">{{ session('success') ? 'Success!' : 'Error!' }}</h3>
+        </div>
+        
+        <p class="text-gray-300 mb-6">
+            {{ session('success') ?? session('error') }}
+        </p>
+        
+        <button 
+            onclick="document.getElementById('alertModal').remove(); window.location.reload();"
+            class="w-full px-4 py-3 {{ session('success') ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700' }} text-white font-semibold rounded-lg transition">
+            OK
+        </button>
+    </div>
+</div>
+
+<style>
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+</style>
 @endif
 
 <!-- Delete Team Modal -->

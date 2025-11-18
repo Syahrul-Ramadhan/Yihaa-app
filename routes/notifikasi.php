@@ -11,3 +11,4 @@ Route::post('/mark-as-read/{id}', [NotifikasiController::class, 'markAsRead'])->
 Route::post('/mark-all-as-read', [NotifikasiController::class, 'markAllAsRead'])->name('markAllAsRead');
 Route::delete('/{id}', [NotifikasiController::class, 'delete'])->name('delete');
 Route::post('/accept-team/{notificationId}/{teamId}', [NotifikasiController::class, 'acceptTeamRequest'])->name('acceptTeam');
+Route::post('/reject-team/{notificationId}/{teamId}', [NotifikasiController::class, 'rejectTeamRequest'])->name('rejectTeam');

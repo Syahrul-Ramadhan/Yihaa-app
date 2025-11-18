@@ -359,7 +359,47 @@ class TeamController extends Controller
 
         $isPending = !empty($pendingResponse->json('data.team_membersCollection.edges'));
 
-        return view('pages.users.team-detail', compact('team', 'members', 'isMember', 'isPending'));
+        // Query pending members (only if user is leader)
+        $pendingMembers = [];
+        if ($team['leader_id'] == $userId) {
+            $pendingMembersQuery = <<<'GRAPHQL'
+            query GetPendingMembers($team_id: BigInt!) {
+                team_membersCollection(filter: { team_id: { eq: $team_id }, status: { eq: "pending" } }) {
+                    edges {
+                        node {
+                            member_id
+                            user_id
+                            users {
+                                name
+                                avatar_url
+                            }
+                        }
+                    }
+                }
+            }
+            GRAPHQL;
+
+            $pendingMembersResponse = Http::withHeaders([
+                'apikey' => env('SUPABASE_ANON_KEY'),
+                'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+                'Content-Type' => 'application/json'
+            ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+                'query' => $pendingMembersQuery,
+                'variables' => ['team_id' => (int) $team_id],
+            ]);
+
+            $pendingEdges = $pendingMembersResponse->json('data.team_membersCollection.edges') ?? [];
+            $pendingMembers = array_map(function($edge) {
+                return [
+                    'member_id' => $edge['node']['member_id'],
+                    'user_id' => $edge['node']['user_id'],
+                    'name' => $edge['node']['users']['name'],
+                    'avatar_url' => $edge['node']['users']['avatar_url'] ?? null,
+                ];
+            }, $pendingEdges);
+        }
+
+        return view('pages.users.team-detail', compact('team', 'members', 'isMember', 'isPending', 'pendingMembers'));
     }
 
     public function join(Request $request, $team_id)
@@ -573,6 +613,153 @@ class TeamController extends Controller
         }
 
         return redirect()->route('teams.index')->with('success', 'Team deleted successfully');
+    }
+
+    public function acceptMember($team_id, $user_id)
+    {
+        $leaderId = session('user_id');
+        if (!$leaderId) {
+            return back()->with('error', 'Please login first');
+        }
+
+        // Verify user is team leader and check member limit
+        $checkQuery = <<<'GRAPHQL'
+        query CheckLeaderAndLimit($team_id: BigInt!, $leaderId: BigInt!) {
+            teamsCollection(filter: { team_id: { eq: $team_id }, leader_id: { eq: $leaderId } }) {
+                edges {
+                    node {
+                        team_id
+                        member_count
+                        member_limit
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        $checkResponse = Http::withHeaders([
+            'apikey' => env('SUPABASE_ANON_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $checkQuery,
+            'variables' => [
+                'team_id' => (int) $team_id,
+                'leaderId' => (int) $leaderId
+            ]
+        ]);
+
+        $teamEdges = $checkResponse->json('data.teamsCollection.edges');
+        if (empty($teamEdges)) {
+            return back()->with('error', 'Only team leader can accept members');
+        }
+
+        $team = $teamEdges[0]['node'];
+        
+        // Check if team is full
+        if ($team['member_count'] >= $team['member_limit']) {
+            return back()->with('error', 'Team is full! Cannot accept more members.');
+        }
+
+        // Update member status to accepted
+        $mutation = <<<'GRAPHQL'
+        mutation UpdateMember($team_id: BigInt!, $user_id: BigInt!) {
+            updateteam_membersCollection(
+                filter: { 
+                    team_id: { eq: $team_id }
+                    user_id: { eq: $user_id }
+                    status: { eq: "pending" }
+                }
+                set: { status: "accepted" }
+            ) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        $response = Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $mutation,
+            'variables' => [
+                'team_id' => (int) $team_id,
+                'user_id' => (int) $user_id
+            ]
+        ]);
+
+        if ($response->failed() || isset($response->json()['errors'])) {
+            return back()->with('error', 'Failed to accept member');
+        }
+
+        return back()->with('success', 'Member accepted successfully');
+    }
+
+    public function rejectMember($team_id, $user_id)
+    {
+        $leaderId = session('user_id');
+        if (!$leaderId) {
+            return back()->with('error', 'Please login first');
+        }
+
+        // Verify user is team leader
+        $checkQuery = <<<'GRAPHQL'
+        query CheckLeader($team_id: BigInt!, $leaderId: BigInt!) {
+            teamsCollection(filter: { team_id: { eq: $team_id }, leader_id: { eq: $leaderId } }) {
+                edges {
+                    node {
+                        team_id
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        $checkResponse = Http::withHeaders([
+            'apikey' => env('SUPABASE_ANON_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $checkQuery,
+            'variables' => [
+                'team_id' => (int) $team_id,
+                'leaderId' => (int) $leaderId
+            ]
+        ]);
+
+        if (empty($checkResponse->json('data.teamsCollection.edges'))) {
+            return back()->with('error', 'Only team leader can reject members');
+        }
+
+        // Delete pending member
+        $mutation = <<<'GRAPHQL'
+        mutation DeleteMember($team_id: BigInt!, $user_id: BigInt!) {
+            deleteFromteam_membersCollection(
+                filter: { 
+                    team_id: { eq: $team_id }
+                    user_id: { eq: $user_id }
+                    status: { eq: "pending" }
+                }
+            ) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $mutation,
+            'variables' => [
+                'team_id' => (int) $team_id,
+                'user_id' => (int) $user_id
+            ]
+        ]);
+
+        return back()->with('success', 'Member rejected');
     }
 
     // public function viewTeam()

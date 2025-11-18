@@ -139,9 +139,42 @@ class NotifikasiController extends Controller
 
     public function acceptTeamRequest($notificationId, $teamId)
     {
+        // Check team member limit first
+        $teamQuery = <<<'GRAPHQL'
+        query GetTeamLimit($teamId: BigInt!) {
+            teamsCollection(filter: { team_id: { eq: $teamId } }) {
+                edges {
+                    node {
+                        member_count
+                        member_limit
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        $teamResponse = Http::withHeaders([
+            'apikey' => env('SUPABASE_ANON_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $teamQuery,
+            'variables' => [
+                'teamId' => (int) $teamId
+            ]
+        ]);
+
+        $teamEdges = $teamResponse->json('data.teamsCollection.edges');
+        if (!empty($teamEdges)) {
+            $team = $teamEdges[0]['node'];
+            if ($team['member_count'] >= $team['member_limit']) {
+                return back()->with('error', 'Team is full! Cannot accept more members.');
+            }
+        }
+
         // Fetch notification untuk ambil from_user_id (user yang request join)
-        $queryNotif = <<<GRAPHQL
-        query {
+        $queryNotif = <<<'GRAPHQL'
+        query GetNotification($notificationId: BigInt!) {
             notificationsCollection(
                 filter: { notification_id: { eq: $notificationId } }
             ) {
@@ -159,7 +192,10 @@ class NotifikasiController extends Controller
             'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
             'Content-Type' => 'application/json'
         ])->post(env('SUPABASE_URL') . '/graphql/v1', [
-            'query' => $queryNotif
+            'query' => $queryNotif,
+            'variables' => [
+                'notificationId' => (int) $notificationId
+            ]
         ]);
 
         $fromUserId = $notifResponse->json('data.notificationsCollection.edges.0.node.from_user_id');
@@ -169,8 +205,8 @@ class NotifikasiController extends Controller
         }
 
         // Update status team member jadi accepted (user yang request join)
-        $mutation = <<<GRAPHQL
-        mutation {
+        $mutation = <<<'GRAPHQL'
+        mutation UpdateTeamMember($teamId: BigInt!, $fromUserId: BigInt!) {
             updateteam_membersCollection(
                 filter: { 
                     team_id: { eq: $teamId }
@@ -184,17 +220,92 @@ class NotifikasiController extends Controller
         }
         GRAPHQL;
 
-        Http::withHeaders([
-            'apikey' => env('SUPABASE_ANON_KEY'),
-            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+        $updateResponse = Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
             'Content-Type' => 'application/json'
         ])->post(env('SUPABASE_URL') . '/graphql/v1', [
-            'query' => $mutation
+            'query' => $mutation,
+            'variables' => [
+                'teamId' => (int) $teamId,
+                'fromUserId' => (int) $fromUserId
+            ]
         ]);
+
+        if ($updateResponse->failed() || isset($updateResponse->json()['errors'])) {
+            return back()->with('error', 'Failed to accept team request');
+        }
 
         // Mark notification as read
         $this->markAsRead($notificationId);
 
         return back()->with('success', 'Team request accepted!');
+    }
+    
+    public function rejectTeamRequest($notificationId, $teamId)
+    {
+        // Fetch notification untuk ambil from_user_id
+        $queryNotif = <<<'GRAPHQL'
+        query GetNotification($notificationId: BigInt!) {
+            notificationsCollection(
+                filter: { notification_id: { eq: $notificationId } }
+            ) {
+                edges {
+                    node {
+                        from_user_id
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        $notifResponse = Http::withHeaders([
+            'apikey' => env('SUPABASE_ANON_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $queryNotif,
+            'variables' => [
+                'notificationId' => (int) $notificationId
+            ]
+        ]);
+
+        $fromUserId = $notifResponse->json('data.notificationsCollection.edges.0.node.from_user_id');
+
+        if (!$fromUserId) {
+            return back()->with('error', 'Invalid notification');
+        }
+
+        // Delete team member request (reject)
+        $mutation = <<<'GRAPHQL'
+        mutation DeleteTeamMember($teamId: BigInt!, $fromUserId: BigInt!) {
+            deleteFromteam_membersCollection(
+                filter: { 
+                    team_id: { eq: $teamId }
+                    user_id: { eq: $fromUserId }
+                    status: { eq: "pending" }
+                }
+            ) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        Http::withHeaders([
+            'apikey' => env('SUPABASE_SERVICE_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+            'Content-Type' => 'application/json'
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $mutation,
+            'variables' => [
+                'teamId' => (int) $teamId,
+                'fromUserId' => (int) $fromUserId
+            ]
+        ]);
+
+        // Delete notification
+        $this->delete($notificationId);
+
+        return back()->with('success', 'Team request rejected');
     }
 }

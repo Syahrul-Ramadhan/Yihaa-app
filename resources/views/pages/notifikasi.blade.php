@@ -81,9 +81,8 @@
                                                     Accept
                                                 </button>
                                             </form>
-                                            <form action="{{ route('notifikasi.delete', $notif['notification_id']) }}" method="POST">
+                                            <form action="{{ route('notifikasi.rejectTeam', [$notif['notification_id'], $notif['team_id']]) }}" method="POST">
                                                 @csrf
-                                                @method('DELETE')
                                                 <button type="submit" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-lg transition">
                                                     <i class="hgi hgi-stroke hgi-cancel-01 mr-1"></i>
                                                     Decline
@@ -126,4 +125,41 @@
             </div>
         @endif
     </div>
+
+    <!-- Success/Error Modal -->
+    @if(session('success') || session('error'))
+    <div id="alertModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-[#0D1517] rounded-2xl p-6 w-full max-w-md border {{ session('success') ? 'border-green-500/30' : 'border-red-500/30' }} transform scale-100 animate-[slideUp_0.3s_ease-out]">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-12 h-12 {{ session('success') ? 'bg-green-500/20' : 'bg-red-500/20' }} rounded-full flex items-center justify-center">
+                    <i class="hgi hgi-stroke {{ session('success') ? 'hgi-checkmark-circle-02 text-green-500' : 'hgi-alert-02 text-red-500' }} text-2xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white">{{ session('success') ? 'Success!' : 'Error!' }}</h3>
+            </div>
+            
+            <p class="text-gray-300 mb-6">
+                {{ session('success') ?? session('error') }}
+            </p>
+            
+            <button 
+                onclick="document.getElementById('alertModal').remove(); window.location.reload();"
+                class="w-full px-4 py-3 {{ session('success') ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700' }} text-white font-semibold rounded-lg transition">
+                OK
+            </button>
+        </div>
+    </div>
+
+    <style>
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    </style>
+    @endif
 @endsection
