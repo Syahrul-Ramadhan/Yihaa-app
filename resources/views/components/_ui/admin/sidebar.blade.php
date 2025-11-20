@@ -1,7 +1,5 @@
     <div 
-        x-data="{ open: true }"
-        class="h-screen flex flex-col justify-between transition-all duration-300 border-r-1 border-gray-600"
-        :class="open ? 'w-64' : 'w-20'"
+        class="h-screen w-70 flex flex-col justify-between transition-all duration-300 border-r-1 border-gray-600"
     >
     <div class=" flex flex-col gap-6">
         <!-- Logo -->
@@ -16,7 +14,7 @@
 
         <!-- Menu -->
         <nav class="flex flex-col space-y-2 mx-6 text-white">
-            <a href="#" class="flex items-center space-x-3 hover:bg-[#2A587E] px-3 py-2 rounded-full">
+            <a href="{{ route('dashboard') }}" class="flex items-center space-x-3 hover:bg-[#2A587E] px-3 py-2 rounded-full">
             <i class="hgi hgi-stroke hgi-chart-rose text-2xl"></i>
             <span x-show="open" class="font-semibold">Dashboard</span>
             </a>

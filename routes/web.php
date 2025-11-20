@@ -25,8 +25,7 @@ Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
 
 Route::prefix('admin')->name('admin.')->group(base_path('routes/admin.php'));
 Route::view('/admin-login', 'pages.users.admin-login')->name('admin.login');
-Route::view('/dashboard', 'dashboard')->name('dashboard');
-
+Route::view('/dashboard', 'pages.admin.dashboard')->name('dashboard');
 
     Route::get('/home', [PostController::class, 'index'])->name('posts.index');
     Route::post('/post/store', [PostController::class, 'store'])->name('posts.store');

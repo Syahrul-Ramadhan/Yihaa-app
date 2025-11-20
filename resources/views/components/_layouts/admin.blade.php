@@ -18,11 +18,14 @@
     @endif
 </head>
 
-<body class="bg-[#01050B]">
-    <x-_ui.admin.sidebar />
-    
-    @yield('content')
+<body class="bg-[#020C0D]">
 
+    <div class="flex min-h-screen">
+        <x-_ui.admin.sidebar />
+        <main class="flex-2">
+            @yield('content')
+        </main>
+    </div>
 </body>
 
 </html>
