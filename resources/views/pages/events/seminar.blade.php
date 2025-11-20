@@ -1,6 +1,9 @@
 @extends('components._layouts.home')
 
 @section('content')
+@php
+    use Carbon\Carbon;
+@endphp
     <div class="max-w-7xl mx-auto grid grid-cols-12 gap-6">
         <div class="col-span-12 md:col-span-8 space-y-6">
             @include('components._ui.tabs', ['active' => 'seminar'])
@@ -11,9 +14,9 @@
                     'title' => $seminar['nama_seminar'] ?? 'Unnamed Seminar',
                     'image' => Vite::asset('resources/images/Poster-seminar.jpg'),
                     'details' => [
-                        ['label' => 'Tanggal', 'value' => $seminar['tanggal_pelaksanaan'] ?? '-'],
-                        ['label' => 'Daftar Mulai', 'value' => $seminar['mulai_pendaftaran'] ?? '-'],
-                        ['label' => 'Daftar Akhir', 'value' => $seminar['akhir_pendaftaran'] ?? '-'],
+                        ['label' => 'Tanggal', 'value' => isset($seminar['tanggal_pelaksanaan']) && $seminar['tanggal_pelaksanaan'] ? Carbon::parse($seminar['tanggal_pelaksanaan'])->locale('id')->translatedFormat('j F Y') : '-'],
+                        ['label' => 'Daftar Mulai', 'value' => isset($seminar['mulai_pendaftaran']) && $seminar['mulai_pendaftaran'] ? Carbon::parse($seminar['mulai_pendaftaran'])->locale('id')->translatedFormat('j F Y') : '-'],
+                        ['label' => 'Daftar Akhir', 'value' => isset($seminar['akhir_pendaftaran']) && $seminar['akhir_pendaftaran'] ? Carbon::parse($seminar['akhir_pendaftaran'])->locale('id')->translatedFormat('j F Y') : '-'],
                         ['label' => 'Lokasi', 'value' => $seminar['lokasi'] ?? '-'],
                         ['label' => 'Pembicara', 'value' => $seminar['pembicara'] ?? '-'],
                         ['label' => 'Deskripsi', 'value' => $seminar['deskripsi'] ?? '-'],
