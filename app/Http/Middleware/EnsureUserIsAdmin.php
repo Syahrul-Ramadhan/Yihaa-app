@@ -15,11 +15,14 @@ class EnsureUserIsAdmin
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!auth()->check()) {
-            return redirect()->route('login')->with('error', 'Please login first.');
+        // Check if user is logged in via session
+        if (!$request->session()->has('user_id')) {
+            return redirect()->route('admin.login')->with('error', 'Please login first.');
         }
 
-        if (!auth()->user()->isAdmin()) {
+        // Check if user role is admin
+        $userRole = $request->session()->get('user_role');
+        if ($userRole !== 'admin') {
             abort(403, 'Unauthorized. Admin access only.');
         }
 

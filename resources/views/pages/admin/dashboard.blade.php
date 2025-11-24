@@ -1,10 +1,13 @@
 @extends('components._layouts.admin')
 @section('content')
+@php
+    use Carbon\Carbon;
+@endphp
 <div class="container mx-auto px-4 py-6 bg-gradient-to-l from-[#163F44] to-[#020C0D] min-h-screen">
     <h1 class="text-3xl font-bold mb-6 text-[#ffffff]">Dashboard</h1>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <!-- Users -->
-        <div class="rounded-xl p-6 flex items-center" style="bg-gradient-to-r from-[#122E32] to-[#0B1A1C]; box-shadow:0 4px 10px rgba(0, 224, 255, 0.15); color:#FFFFFF;">
+        <div class="rounded-xl p-6 flex items-center" style="background: linear-gradient(to right, #122E32, #0B1A1C); box-shadow: 0 4px 10px rgba(0, 224, 255, 0.15); color: #FFFFFF;">
             <div class="mr-4">
                 <!-- Users Icon -->
                 <svg width="36" height="36" fill="none" stroke="#1CC8EE" stroke-width="2" viewBox="0 0 24 24">
@@ -19,7 +22,7 @@
             </div>
         </div>
         <!-- Materi -->
-        <div class="rounded-xl p-6 flex items-center" style="bg-gradient-to-r from-[#122E32] to-[#0B1A1C]; box-shadow:0 4px 10px rgba(0, 224, 255, 0.15); color:#FFFFFF;">
+        <div class="rounded-xl p-6 flex items-center" style="background: linear-gradient(to right, #122E32, #0B1A1C); box-shadow: 0 4px 10px rgba(0, 224, 255, 0.15); color: #FFFFFF;">
             <div class="mr-4">
                 <!-- Materi Icon -->
                 <svg width="36" height="36" fill="none" stroke="#1CC8EE" stroke-width="2" viewBox="0 0 24 24">
@@ -33,7 +36,7 @@
             </div>
         </div>
         <!-- Events -->
-        <div class="rounded-xl p-6 flex items-center" style="bg-gradient-to-r from-[#122E32] to-[#0B1A1C]; box-shadow:0 4px 10px rgba(0, 224, 255, 0.15); color:#FFFFFF;">
+        <div class="rounded-xl p-6 flex items-center" style="background: linear-gradient(to right, #122E32, #0B1A1C); box-shadow: 0 4px 10px rgba(0, 224, 255, 0.15); color: #FFFFFF;">
             <div class="mr-4">
                 <!-- Events Icon -->
                 <svg width="36" height="36" fill="none" stroke="#1CC8EE" stroke-width="2" viewBox="0 0 24 24">
@@ -47,7 +50,7 @@
             </div>
         </div>
         <!-- Teams -->
-        <div class="rounded-xl p-6 flex items-center" style="bg-gradient-to-r from-[#122E32] to-[#0B1A1C]; box-shadow:0 4px 10px rgba(0, 224, 255, 0.15); color:#FFFFFF;">
+        <div class="rounded-xl p-6 flex items-center" style="background: linear-gradient(to right, #122E32, #0B1A1C); box-shadow: 0 4px 10px rgba(0, 224, 255, 0.15); color: #FFFFFF;">
             <div class="mr-4">
                 <!-- Teams Icon -->
                 <svg width="36" height="36" fill="none" stroke="#1CC8EE" stroke-width="2" viewBox="0 0 24 24">
@@ -66,7 +69,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <!-- Tabel Materi -->
-        <div class="rounded-xl p-6" style="bg-gradient-to-r from-[#122E32] to-[#0B1A1C]; box-shadow:0 4px 10px rgba(0, 224, 255, 0.15); color:#FFFFFF;">
+        <div class="rounded-xl p-6" style="background: linear-gradient(to right, #122E32, #0B1A1C); box-shadow: 0 4px 10px rgba(0, 224, 255, 0.15); color: #FFFFFF;">
             <h2 class="text-xl font-semibold mb-4 text-[#1CC8EE]">Materi Terbaru</h2>
             <table class="min-w-full text-sm text-white">
                 <thead>
@@ -77,18 +80,18 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($materiList ?? [] as $materials)
+                    @foreach($materiList ?? [] as $material)
                     <tr class="border-b">
-                        <td class="py-2 px-4">{{ $materials->title }}</td>
-                        <td class="py-2 px-4">{{ $materials->description }}</td>
-                        <td class="py-2 px-4">{{ $materials->created_at->format('d M Y') }}</td>
+                        <td class="py-2 px-4">{{ $material['tittle'] ?? 'N/A' }}</td>
+                        <td class="py-2 px-4">{{ Str::limit($material['description'] ?? '-', 50) }}</td>
+                        <td class="py-2 px-4">{{ isset($material['created_at']) ? \Carbon\Carbon::parse($material['created_at'])->format('d M Y') : '-' }}</td>
                     </tr>
                     @endforeach
                 </tbody>
             </table>
         </div>
         <!-- Tabel Events -->
-        <div class="rounded-xl p-6" style="bg-gradient-to-r from-[#122E32] to-[#0B1A1C]; box-shadow:0 4px 10px rgba(0, 224, 255, 0.15); color:#FFFFFF;">
+        <div class="rounded-xl p-6" style="background: linear-gradient(to right, #122E32, #0B1A1C); box-shadow: 0 4px 10px rgba(0, 224, 255, 0.15); color: #FFFFFF;">
             <h2 class="text-xl font-semibold mb-4 text-[#1CC8EE]">Event Terbaru</h2>
             <table class="min-w-full text-sm text-white">
                 <thead>
@@ -101,9 +104,9 @@
                 <tbody>
                     @foreach($eventsList ?? [] as $event)
                     <tr class="border-b">
-                        <td class="py-2 px-4">{{ $event->nama }}</td>
-                        <td class="py-2 px-4">{{ $event->tanggal->format('d M Y') }}</td>
-                        <td class="py-2 px-4">{{ $event->nama_event }}</td>
+                        <td class="py-2 px-4">{{ $event['nama'] ?? '-' }}</td>
+                        <td class="py-2 px-4">{{ isset($event['tanggal']) ? \Carbon\Carbon::parse($event['tanggal'])->format('d M Y') : '-' }}</td>
+                        <td class="py-2 px-4">{{ $event['nama_event'] ?? '-' }}</td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -111,7 +114,7 @@
         </div>
     </div>
 
-    <div class="rounded-xl p-6 mb-8" style="bg-gradient-to-r from-[#122E32] to-[#0B1A1C]; box-shadow:0 4px 10px rgba(0, 224, 255, 0.15); color:#FFFFFF;">
+    <div class="rounded-xl p-6 mb-8" style="background: linear-gradient(to right, #122E32, #0B1A1C); box-shadow: 0 4px 10px rgba(0, 224, 255, 0.15); color: #FFFFFF;">
         <h2 class="text-xl font-semibold mb-4 text-[#1CC8EE]">Daftar Tim</h2>
         <table class="min-w-full text-sm text-white">
             <thead>
@@ -121,10 +124,10 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach($teamsList ?? [] as $teams)
+                @foreach($teamsList ?? [] as $team)
                 <tr class="border-b">
-                    <td class="py-2 px-4">{{ $team['team_name'] }}</td>
-                    <td class="py-2 px-4">{{ $team['team_desc'] }}</td>
+                    <td class="py-2 px-4">{{ $team['team_name'] ?? '-' }}</td>
+                    <td class="py-2 px-4">{{ Str::limit($team['team_desc'] ?? '-', 50) }}</td>
                 </tr>
                 @endforeach
             </tbody>

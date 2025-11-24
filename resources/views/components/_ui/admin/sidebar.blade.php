@@ -14,20 +14,20 @@
 
         <!-- Menu -->
         <nav class="flex flex-col space-y-2 mx-6 text-white">
-            <a href="{{ route('dashboard') }}" class="flex items-center space-x-3 hover:bg-[#2A587E] px-3 py-2 rounded-full">
+            <a href="{{ route('admin.dashboard') }}" class="flex items-center space-x-3 hover:bg-[#2A587E] px-3 py-2 rounded-full {{ request()->routeIs('admin.dashboard') ? 'bg-[#2A587E]' : '' }}">
             <i class="hgi hgi-stroke hgi-chart-rose text-2xl"></i>
             <span x-show="open" class="font-semibold">Dashboard</span>
             </a>
 
-            <a href="#" class="flex items-center space-x-3 hover:bg-[#2A587E] px-3 py-2 rounded-full">
+            <a href="{{ route('admin.events.index') }}" class="flex items-center space-x-3 hover:bg-[#2A587E] px-3 py-2 rounded-full {{ request()->routeIs('admin.events.*') ? 'bg-[#2A587E]' : '' }}">
             <i class="hgi hgi-stroke hgi-calendar-02 text-2xl"></i>
             <span x-show="open">Event</span>
             </a>
 
-            <a href="#" class="flex items-center space-x-3 hover:bg-[#2A587E] px-3 py-2 rounded-full relative">
+            <a href="{{ route('admin.materials.index') }}" class="flex items-center space-x-3 hover:bg-[#2A587E] px-3 py-2 rounded-full relative {{ request()->routeIs('admin.materials.*') ? 'bg-[#2A587E]' : '' }}">
             <i class="hgi hgi-stroke hgi-book-edit text-2xl"></i>
             <span x-show="open">Modules</span>
-            <span class="absolute left-5 top-1 bg-blue-500 text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">1</span>
+            <span class="absolute left-5 top-1 bg-blue-500 text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center" id="pending-count" style="display: none;">1</span>
             </a>
 
             <a href="#" class="flex items-center space-x-3 hover:bg-[#2A587E] px-3 py-2 rounded-full">

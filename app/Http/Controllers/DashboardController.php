@@ -20,9 +20,56 @@ class DashboardController extends Controller
         $query = <<<'GRAPHQL'
         query {
             usersCollection { edges { node { id name email } } }
-            materialsCollection { edges { node { materi_id title description created_at } } }
-            lombaCollection { edges { node { id nama tanggal lokasi } } }
-            teamsCollection { edges { node { team_id team_name member_count } } }
+            materialsCollection(orderBy: { created_at: DescNullsLast }, first: 5) { 
+                edges { 
+                    node { 
+                        material_id 
+                        tittle 
+                        description 
+                        created_at 
+                    } 
+                } 
+            }
+            seminarCollection(orderBy: { created_at: DescNullsLast }, first: 3) {
+                edges {
+                    node {
+                        seminar_id
+                        nama_seminar
+                        tanggal_pelaksanaan
+                        created_at
+                    }
+                }
+            }
+            beasiswaCollection(orderBy: { created_at: DescNullsLast }, first: 3) {
+                edges {
+                    node {
+                        beasiswa_id
+                        nama_beasiswa
+                        mulai_pendaftaran
+                        created_at
+                    }
+                }
+            }
+            lombaCollection(orderBy: { created_at: DescNullsLast }, first: 3) {
+                edges {
+                    node {
+                        lomba_id
+                        nama_lomba
+                        tanggal_pelaksanaan
+                        created_at
+                    }
+                }
+            }
+            teamsCollection(orderBy: { created_at: DescNullsLast }, first: 10) { 
+                edges { 
+                    node { 
+                        team_id 
+                        team_name 
+                        team_desc
+                        member_count 
+                    } 
+                } 
+            }
         }
         GRAPHQL;
 
@@ -36,13 +83,44 @@ class DashboardController extends Controller
 
         $users = array_map(fn($edge) => $edge['node'], $data['usersCollection']['edges'] ?? []);
         $materials = array_map(fn($edge) => $edge['node'], $data['materialsCollection']['edges'] ?? []);
-        $events = array_map(fn($edge) => $edge['node'], $data['lombaCollection']['edges'] ?? []);
+        
+        // Combine all events
+        $seminars = array_map(fn($edge) => $edge['node'], $data['seminarCollection']['edges'] ?? []);
+        $beasiswas = array_map(fn($edge) => $edge['node'], $data['beasiswaCollection']['edges'] ?? []);
+        $lombas = array_map(fn($edge) => $edge['node'], $data['lombaCollection']['edges'] ?? []);
+        
+        // Format events for display
+        $events = [];
+        foreach ($seminars as $seminar) {
+            $events[] = [
+                'nama' => 'Seminar',
+                'tanggal' => $seminar['tanggal_pelaksanaan'] ?? $seminar['created_at'],
+                'nama_event' => $seminar['nama_seminar'] ?? 'Seminar'
+            ];
+        }
+        foreach ($beasiswas as $beasiswa) {
+            $events[] = [
+                'nama' => 'Beasiswa',
+                'tanggal' => $beasiswa['mulai_pendaftaran'] ?? $beasiswa['created_at'],
+                'nama_event' => $beasiswa['nama_beasiswa'] ?? 'Beasiswa'
+            ];
+        }
+        foreach ($lombas as $lomba) {
+            $events[] = [
+                'nama' => 'Lomba',
+                'tanggal' => $lomba['tanggal_pelaksanaan'] ?? $lomba['created_at'],
+                'nama_event' => $lomba['nama_lomba'] ?? 'Lomba'
+            ];
+        }
+        usort($events, fn($a, $b) => strtotime($b['tanggal']) - strtotime($a['tanggal']));
+        $events = array_slice($events, 0, 5);
+        
         $teams = array_map(fn($edge) => $edge['node'], $data['teamsCollection']['edges'] ?? []);
 
         return view('pages.admin.dashboard', [
             'usersCount' => count($users),
             'materiCount' => count($materials),
-            'eventsCount' => count($events),
+            'eventsCount' => count($seminars) + count($beasiswas) + count($lombas),
             'teamsCount' => count($teams),
             'materiList' => $materials,
             'eventsList' => $events,
@@ -52,6 +130,78 @@ class DashboardController extends Controller
  
     public function viewManageEvent()
     {
-        return view('pages.admin.manage-event');
+        // Fetch all events
+        $query = <<<'GRAPHQL'
+        query {
+            seminarCollection(orderBy: { created_at: DescNullsLast }) {
+                edges {
+                    node {
+                        seminar_id
+                        nama_seminar
+                        tanggal_pelaksanaan
+                        mulai_pendaftaran
+                        akhir_pendaftaran
+                        lokasi
+                        pembicara
+                        deskripsi
+                        link_pendaftaran
+                        created_at
+                    }
+                }
+            }
+            beasiswaCollection(orderBy: { created_at: DescNullsLast }) {
+                edges {
+                    node {
+                        beasiswa_id
+                        nama_beasiswa
+                        jenjang_beasiswa
+                        mulai_pendaftaran
+                        akhir_pendaftaran
+                        syarat_beasiswa
+                        benefit_beasiswa
+                        pemberi_beasiswa
+                        link_pendaftaran
+                        created_at
+                    }
+                }
+            }
+            lombaCollection(orderBy: { created_at: DescNullsLast }) {
+                edges {
+                    node {
+                        lomba_id
+                        nama_lomba
+                        tanggal_pelaksanaan
+                        mulai_pendaftaran
+                        akhir_pendaftaran
+                        lokasi
+                        kategori_lomba
+                        deskripsi
+                        penyelenggara
+                        link_pendaftaran
+                        created_at
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        $response = Http::withHeaders([
+            'apikey' => $this->supabaseKey,
+            'Authorization' => 'Bearer ' . $this->supabaseKey,
+            'Content-Type' => 'application/json'
+        ])->post($this->supabaseUrl, ['query' => $query]);
+
+        $data = $response->json('data') ?? [];
+
+        $seminars = array_map(fn($edge) => $edge['node'], $data['seminarCollection']['edges'] ?? []);
+        $beasiswas = array_map(fn($edge) => $edge['node'], $data['beasiswaCollection']['edges'] ?? []);
+        $lombas = array_map(fn($edge) => $edge['node'], $data['lombaCollection']['edges'] ?? []);
+
+        return view('pages.admin.manage-event', compact('seminars', 'beasiswas', 'lombas'));
+    }
+
+    public function viewevem()
+    {
+        return view('pages.admin.dashboard');
     }
 }

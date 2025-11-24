@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
@@ -177,11 +178,11 @@ class AuthController extends Controller
             'user_role' => $user['role'],
             'avatar_url' => $user['avatar_url'],
         ]);
-
         // Update user_id di tabel sessions
-        \DB::table('sessions')
+        DB::table('sessions')
             ->where('id', session()->getId())
             ->update(['user_id' => $user['id']]);
+  
 
         // Redirect to loading screen instead of showing modal
         return redirect()->route('login.loading');
@@ -192,6 +193,94 @@ class AuthController extends Controller
         $request->session()->flush(); // hapus semua session
         // Redirect to logout loading screen instead of login with modal
         return view('pages.users.logout-loading');
+    }
+
+    public function adminLogin(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|min:6',
+        ], [
+            'email.required' => 'Email wajib diisi.',
+            'email.email' => 'Format email tidak valid.',
+            'password.required' => 'Password wajib diisi.',
+            'password.min' => 'Password minimal 6 karakter.',
+        ]);
+
+        $email = $request->input('email');
+        $password = $request->input('password');
+
+        // Query GraphQL untuk mencari user berdasarkan email
+        $query = <<<'GRAPHQL'
+        query GetUser($email: String!) {
+            usersCollection(filter: { email: { eq: $email } }) {
+                edges {
+                    node {
+                        id
+                        name
+                        email
+                        password
+                        role
+                        avatar_url
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        // Kirim request ke Supabase GraphQL API
+        $response = Http::withHeaders([
+            'apikey' => env('SUPABASE_ANON_KEY'),
+            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+            'Content-Type' => 'application/json',
+        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+            'query' => $query,
+            'variables' => [
+                'email' => $email,
+            ],
+        ]);
+
+        if ($response->failed()) {
+            return back()->with('error', 'Failed to connect to database.');
+        }
+
+        $edges = $response->json('data.usersCollection.edges') ?? [];
+
+        if (empty($edges)) {
+            return back()->with('error', 'Email atau password salah.');
+        }
+
+        $user = $edges[0]['node'];
+
+        // Cek role admin
+        if ($user['role'] !== 'admin') {
+            return back()->with('error', 'Access denied. Admin only.');
+        }
+
+        // Cek password
+        if (!Hash::check($password, $user['password'])) {
+            return back()->with('error', 'Email atau password salah.');
+        }
+
+        // Regenerate session untuk keamanan
+        $request->session()->regenerate();
+
+        // Simpan data user di session
+        session([
+            'user_id' => $user['id'],
+            'user_name' => $user['name'],
+            'user_email' => $user['email'],
+            'user_role' => $user['role'],
+            'avatar_url' => $user['avatar_url'],
+        ]);
+
+        // Update user_id di tabel sessions
+        DB::table('sessions')
+            ->where('id', session()->getId())
+            ->update(['user_id' => $user['id']]);
+
+        // Redirect ke admin dashboard
+        return redirect()->route('admin.dashboard')->with('success', 'Welcome back, ' . $user['name'] . '!');
     }
 
     public function profile(Request $request)

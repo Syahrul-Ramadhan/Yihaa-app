@@ -7,6 +7,7 @@ use App\Http\Controllers\PostController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TeamChatController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\NotifikasiController;
 use App\Http\Controllers\ProfileController;
@@ -24,10 +25,17 @@ Route::view('/', 'pages.users.login')->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.process');
 Route::get('/login-loading', [AuthController::class, 'loginLoading'])->name('login.loading');
 Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
+// Route::get('/event', [DashboardController::class, 'manage-event'])->name('manage-event');
 
+// Admin routes - enabled
 Route::prefix('admin')->name('admin.')->group(base_path('routes/admin.php'));
-Route::view('/admin-login', 'pages.users.admin-login')->name('admin.login');
-Route::view('/dashboard', 'pages.admin.dashboard')->name('dashboard');
+
+// Admin login routes
+Route::view('/admin-login', 'pages.admin.admin-login')->name('admin.login');
+Route::post('/admin-login', [AuthController::class, 'adminLogin'])->name('admin.login.process');
+
+// Legacy dashboard route - redirect to admin dashboard (if user is admin)
+Route::get('/dashboard', [DashboardController::class, 'viewDashboard'])->name('dashboard');
 
     Route::get('/home', [PostController::class, 'index'])->name('posts.index');
     Route::post('/post/store', [PostController::class, 'store'])->name('posts.store');
