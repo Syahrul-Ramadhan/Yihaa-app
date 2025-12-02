@@ -23,3 +23,7 @@
     --primary-color-500: "#0D1517";
     --primary-color-base: "#020C0D";
 }
+
+[x-cloak] { 
+    display: none !important; 
+}

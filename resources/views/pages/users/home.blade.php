@@ -205,7 +205,7 @@
                     <!-- =============================== -->
                     <!-- POP UP KOMENTAR -->
                     <!-- =============================== -->
-                    <div x-show="open"
+                    <div x-show="open" x-cloak
                         class="fixed inset-0 bg-[#0000006b] bg-opacity-70 flex justify-center items-center z-50 text-gray-100"
                         x-transition>
 
