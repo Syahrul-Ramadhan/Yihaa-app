@@ -4,14 +4,15 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ProfileController extends Controller
 {
     public function index()
     {
         $userId = session('user_id');
-        \Log::info('Profile Index - User ID from session:', ['user_id' => $userId]);
-        
+        Log::info('Profile Index - User ID from session:', ['user_id' => $userId]);
+
         if (!$userId) {
             return redirect()->route('login');
         }
@@ -54,21 +55,21 @@ class ProfileController extends Controller
             'variables' => ['userId' => (int) $userId]
         ]);
 
-        \Log::info('Profile Index - GraphQL Response:', [
+        Log::info('Profile Index - GraphQL Response:', [
             'status' => $response->status(),
             'body' => $response->json()
         ]);
 
         if ($response->failed()) {
-            \Log::error('Profile Index - Response failed');
+            Log::error('Profile Index - Response failed');
             return back()->with('error', 'Failed to load profile');
         }
 
         $userEdges = $response->json('data.usersCollection.edges');
-        \Log::info('Profile Index - User Edges:', ['edges' => $userEdges]);
-        
+        Log::info('Profile Index - User Edges:', ['edges' => $userEdges]);
+
         if (empty($userEdges)) {
-            \Log::warning('Profile Index - User not found for ID: ' . $userId);
+            Log::warning('Profile Index - User not found for ID: ' . $userId);
             // Show debug info
             dd([
                 'user_id' => $userId,
@@ -80,7 +81,7 @@ class ProfileController extends Controller
         }
 
         $user = $userEdges[0]['node'];
-        
+
         // Get profile separately
         $profileEdges = $response->json('data.profilesCollection.edges');
         $profile = !empty($profileEdges) ? $profileEdges[0]['node'] : null;
@@ -270,7 +271,7 @@ class ProfileController extends Controller
         ]);
 
         $edges = $response->json('data.team_membersCollection.edges') ?? [];
-        return array_map(function($edge) {
+        return array_map(function ($edge) {
             return [
                 'team_id' => $edge['node']['teams']['team_id'],
                 'team_name' => $edge['node']['teams']['team_name'],
@@ -335,7 +336,7 @@ class ProfileController extends Controller
         }
 
         $user = $userEdges[0]['node'];
-        
+
         // Get profile separately
         $profileEdges = $response->json('data.profilesCollection.edges');
         $profile = !empty($profileEdges) ? $profileEdges[0]['node'] : null;
@@ -382,7 +383,7 @@ class ProfileController extends Controller
                     $avatarUrl = env('SUPABASE_URL') . '/storage/v1/object/public/' . $bucketName . '/' . $fileName;
                 }
             } catch (\Exception $e) {
-                \Log::warning('Avatar upload error: ' . $e->getMessage());
+                Log::warning('Avatar upload error: ' . $e->getMessage());
             }
         }
 
@@ -405,6 +406,7 @@ class ProfileController extends Controller
 
         if ($avatarUrl) {
             $userVars['avatar_url'] = $avatarUrl;
+            session(['avatar_url' => $avatarUrl]); // Update session
         }
 
         Http::withHeaders([

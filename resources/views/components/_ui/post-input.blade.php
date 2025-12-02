@@ -4,7 +4,7 @@
     @csrf
 
     <div class="flex space-x-3">
-        <img src="{{  session('avatar_url') }}" class="w-10 h-10 rounded-full">
+        <img src="{{ session('avatar_url') ?? 'https://qdfotopajdiuailyeprh.supabase.co/storage/v1/object/public/avatars/default-user.jpg' }}" class="w-10 h-10 rounded-full object-cover">
         <div class="flex-1">
 
             <textarea name="caption" placeholder="What’s new?"
