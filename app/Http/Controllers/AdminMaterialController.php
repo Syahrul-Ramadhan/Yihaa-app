@@ -9,11 +9,13 @@ class AdminMaterialController extends Controller
 {
     protected $supabaseUrl;
     protected $supabaseKey;
+    private $supabaseStorage;
 
     public function __construct()
     {
         $this->supabaseUrl = env('SUPABASE_URL') . '/graphql/v1';
         $this->supabaseKey = env('SUPABASE_SERVICE_KEY'); // Use service key for admin operations
+        $this->supabaseStorage = env('SUPABASE_URL') . '/storage/v1/object';
     }
 
     public function index()
@@ -128,53 +130,112 @@ class AdminMaterialController extends Controller
 
     public function store(Request $request)
     {
+        // dd($request->all());
+        
         $request->validate([
             'tittle' => 'required|string|max:200',
             'description' => 'nullable|string',
-            'file_url' => 'nullable|string|max:500',
-            'thumbnail_url' => 'nullable|string|max:500',
-            'status' => 'nullable|string|in:pending,approved,rejected',
+            'file' => 'nullable|file',
+            'image' => 'nullable|image',
         ]);
 
-        $mutation = <<<'GRAPHQL'
+        $imageUrl = null;
+        $fileUrl  = null;
+
+        //upload ke supabase storage jika ada gambar
+        if ($request->hasFile('image')) {
+
+            $bucketName = 'material_images';
+
+            $file = $request->file('image');
+            $fileName = 'material_' . time() . '.' . $file->getClientOriginalExtension();
+            $fileContent = file_get_contents($file);
+
+            // Upload ke Supabase Storage
+            $upload = Http::withHeaders([
+                'apikey' => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
+            ])
+            ->attach(
+                'file',                       // field name
+                $fileContent,                 // isi file
+                $fileName                     // nama file
+            )
+            ->post($this->supabaseStorage . '/material_images/' . $fileName);
+
+            if ($upload->failed()) {
+                return dd($upload->json());
+            }
+
+            // URL file
+            $imageUrl = $this->supabaseStorage . '/' . $bucketName . '/' . $fileName;
+        }
+
+        if ($request->hasFile('file')) {
+
+            $bucketName = 'material_files';
+            $file = $request->file('file');
+
+            $fileName = 'file_' . time() . '.' . $file->getClientOriginalExtension();
+            $fileContent = file_get_contents($file);
+
+            $upload = Http::withHeaders([
+                'apikey'        => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
+            ])
+            ->attach('file', $fileContent, $fileName)
+            ->post($this->supabaseStorage . '/material_files/' . $fileName);
+
+            if ($upload->failed()) return dd($upload->json());
+
+            $fileUrl = $this->supabaseStorage . "/$bucketName/$fileName";
+        }
+
+        // Ambil variabel
+        $tittle                 = $request->tittle;
+        $description            = $request->description;
+
+        $query = <<<'GRAPHQL'
         mutation InsertMaterial(
             $tittle: String!,
-            $description: String,
-            $file_url: String!,
-            $thumbnail_url: String,
-            $status: String
+            $description: String!,
+            $file: String,
+            $image: String
         ) {
             insertIntomaterialsCollection(
                 objects: {
                     tittle: $tittle,
                     description: $description,
                     uploaded_by: 1,
-                    file_url: $file_url,
-                    thumbnail_url: $thumbnail_url,
-                    status: $status
+                    file_url: $file,
+                    thumbnail_url: $image,
+                    status: "approved"
                 }
             ) {
                 affectedCount
                 records {
                     material_id
-                    tittle
                 }
             }
         }
         GRAPHQL;
 
-        $variables = $request->all();
-        $variables['file_url'] = $variables['file_url'] ?? '';
-        $variables['status'] = $variables['status'] ?? 'approved'; // Admin created materials are approved by default
-
+        // Kirim ke Supabase
         $response = Http::withHeaders([
-            'apikey' => $this->supabaseKey,
+            'apikey'        => $this->supabaseKey,
             'Authorization' => 'Bearer ' . $this->supabaseKey,
-            'Content-Type' => 'application/json'
+            'Content-Type'  => 'application/json'
         ])->post($this->supabaseUrl, [
-            'query' => $mutation,
-            'variables' => $variables
+            'query' => $query,
+            'variables' => [
+                'tittle'                => $tittle,
+                'description'  => $description,
+                'file'                => $fileUrl ?? null,
+                'image'              => $imageUrl ?? null,
+            ]
         ]);
+
+        // dd($response->status(), $response->body());
 
         if ($response->failed() || isset($response->json()['errors'])) {
             return back()->with('error', 'Failed to create material: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'));
@@ -238,6 +299,7 @@ class AdminMaterialController extends Controller
 
     public function destroy($id)
     {
+
         $mutation = <<<'GRAPHQL'
         mutation DeleteMaterial($material_id: BigInt!) {
             deleteFrommaterialsCollection(filter: { material_id: { eq: $material_id } }) {
@@ -262,6 +324,3 @@ class AdminMaterialController extends Controller
         return back()->with('success', 'Material deleted successfully!');
     }
 }
-
-
-

@@ -9,469 +9,875 @@ class AdminEventController extends Controller
 {
     protected $supabaseUrl;
     protected $supabaseKey;
+    private $supabaseStorage;
 
     public function __construct()
     {
         $this->supabaseUrl = env('SUPABASE_URL') . '/graphql/v1';
         $this->supabaseKey = env('SUPABASE_SERVICE_KEY'); // Use service key for admin operations
+        $this->supabaseStorage = env('SUPABASE_URL') . '/storage/v1/object';
     }
 
     // SEMINAR CRUD
     public function storeSeminar(Request $request)
     {
+        // dd($request->all());
+
+        // Validasi input
         $request->validate([
-            'nama_seminar' => 'required|string|max:200',
+            'nama'                => 'required|string|max:255',
             'tanggal_pelaksanaan' => 'required|date',
-            'mulai_pendaftaran' => 'required|date',
-            'akhir_pendaftaran' => 'required|date',
-            'lokasi' => 'nullable|string|max:255',
-            'pembicara' => 'nullable|string|max:200',
-            'deskripsi' => 'nullable|string',
-            'link_pendaftaran' => 'nullable|string|max:500',
+            'mulai_pendaftaran'   => 'required|date',
+            'akhir_pendaftaran'   => 'required|date',
+            'lokasi'              => 'required|string|max:255',
+            'pembicara'           => 'required|string|max:255',
+            'deskripsi'           => 'required|string',
+            'link'                => 'required|string',
+            'gambar'              => 'nullable|image|max:2048',
         ]);
 
-        $mutation = <<<'GRAPHQL'
+        $imageUrl = null;
+
+        //upload ke supabase storage jika ada gambar
+        if ($request->hasFile('gambar')) {
+
+            $bucketName = 'seminar-images';
+
+            $file = $request->file('gambar');
+            $fileName = 'seminar_' . time() . '.' . $file->getClientOriginalExtension();
+            $fileContent = file_get_contents($file);
+
+            // Upload ke Supabase Storage
+            $upload = Http::withHeaders([
+                'apikey' => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
+            ])
+            ->attach(
+                'file',                       // field name
+                $fileContent,                 // isi file
+                $fileName                     // nama file
+            )
+            ->post($this->supabaseStorage . '/seminar-images/' . $fileName);
+
+            if ($upload->failed()) {
+                return dd($upload->json());
+            }
+
+            // URL file
+            $imageUrl = $this->supabaseStorage . '/' . $bucketName . '/' . $fileName;
+        }
+
+        // Ambil data request
+        $nama                = $request->nama;
+        $tanggalPelaksanaan  = $request->tanggal_pelaksanaan;
+        $mulaiPendaftaran    = $request->mulai_pendaftaran;
+        $akhirPendaftaran    = $request->akhir_pendaftaran;
+        $lokasi              = $request->lokasi;
+        $pembicara           = $request->pembicara;
+        $deskripsi           = $request->deskripsi;
+        $link                = $request->link;
+
+        // GraphQL Mutation
+        $query = <<<GRAPHQL
         mutation InsertSeminar(
-            $nama_seminar: String!,
-            $tanggal_pelaksanaan: Date!,
-            $mulai_pendaftaran: Date!,
-            $akhir_pendaftaran: Date!,
-            $lokasi: String,
-            $pembicara: String,
-            $deskripsi: String,
-            $link_pendaftaran: String
+            \$nama: String!,
+            \$tanggalPelaksanaan: Date!,
+            \$mulaiPendaftaran: Date!,
+            \$akhirPendaftaran: Date!,
+            \$lokasi: String!,
+            \$pembicara: String!,
+            \$deskripsi: String!,
+            \$link: String!,
+            \$gambar: String
         ) {
             insertIntoseminarCollection(
                 objects: {
-                    nama_seminar: $nama_seminar,
-                    tanggal_pelaksanaan: $tanggal_pelaksanaan,
-                    mulai_pendaftaran: $mulai_pendaftaran,
-                    akhir_pendaftaran: $akhir_pendaftaran,
-                    lokasi: $lokasi,
-                    pembicara: $pembicara,
-                    deskripsi: $deskripsi,
-                    link_pendaftaran: $link_pendaftaran
+                    nama_seminar: \$nama,
+                    tanggal_pelaksanaan: \$tanggalPelaksanaan,
+                    mulai_pendaftaran: \$mulaiPendaftaran,
+                    akhir_pendaftaran: \$akhirPendaftaran,
+                    lokasi: \$lokasi,
+                    pembicara: \$pembicara,
+                    deskripsi: \$deskripsi,
+                    link_pendaftaran: \$link,
+                    image_url: \$gambar
                 }
             ) {
                 affectedCount
-                records {
-                    seminar_id
-                    nama_seminar
-                }
             }
         }
         GRAPHQL;
 
+        // Kirim ke Supabase
         $response = Http::withHeaders([
-            'apikey' => $this->supabaseKey,
+            'apikey'        => $this->supabaseKey,
             'Authorization' => 'Bearer ' . $this->supabaseKey,
-            'Content-Type' => 'application/json'
+            'Content-Type'  => 'application/json'
         ])->post($this->supabaseUrl, [
-            'query' => $mutation,
-            'variables' => $request->all()
+            'query' => $query,
+            'variables' => [
+                'nama'                => $nama,
+                'tanggalPelaksanaan'  => $tanggalPelaksanaan,
+                'mulaiPendaftaran'    => $mulaiPendaftaran,
+                'akhirPendaftaran'    => $akhirPendaftaran,
+                'lokasi'              => $lokasi,
+                'pembicara'           => $pembicara,
+                'deskripsi'           => $deskripsi,
+                'link'                => $link,
+                'gambar'              => $imageUrl ?? '',
+            ]
         ]);
 
-        if ($response->failed() || isset($response->json()['errors'])) {
-            return back()->with('error', 'Failed to create seminar: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'));
+        // Jika error
+        if ($response->failed()) {
+            return dd($response->json());
         }
 
-        return back()->with('success', 'Seminar created successfully!');
+        return back()->with('success', 'Seminar berhasil ditambahkan!');
     }
 
-    public function updateSeminar(Request $request, $id)
+    public function updateSeminar(Request $request)
     {
+        // Validasi
         $request->validate([
-            'nama_seminar' => 'required|string|max:200',
+            'id'                  => 'required|integer',
+            'nama'                => 'required|string|max:255',
             'tanggal_pelaksanaan' => 'required|date',
-            'mulai_pendaftaran' => 'required|date',
-            'akhir_pendaftaran' => 'required|date',
-            'lokasi' => 'nullable|string|max:255',
-            'pembicara' => 'nullable|string|max:200',
-            'deskripsi' => 'nullable|string',
-            'link_pendaftaran' => 'nullable|string|max:500',
+            'mulai_pendaftaran'   => 'required|date',
+            'akhir_pendaftaran'   => 'required|date',
+            'lokasi'              => 'required|string|max:255',
+            'pembicara'           => 'required|string|max:255',
+            'deskripsi'           => 'required|string',
+            'link'                => 'required|url',
+            'gambar'              => 'nullable|image|max:2048', // <--- validasi gambar
+            'old_image'           => 'nullable|string',         // <--- gambar lama
+            
         ]);
 
-        $mutation = <<<'GRAPHQL'
+        // Ambil variabel
+        $id                 = $request->id;
+        $nama               = $request->nama;
+        $tanggalPelaksanaan = $request->tanggal_pelaksanaan;
+        $mulaiPendaftaran   = $request->mulai_pendaftaran;
+        $akhirPendaftaran   = $request->akhir_pendaftaran;
+        $lokasi             = $request->lokasi;
+        $pembicara          = $request->pembicara;
+        $deskripsi          = $request->deskripsi;
+        $link               = $request->link;
+
+        $newImageUrl = $request->old_image;
+
+        if ($request->hasFile('gambar')) {
+
+            // Hapus gambar lama dari storage Supabase
+            if ($request->old_image) {
+                $this->deleteFromStorage($request->old_image, 'seminar-images');
+            }
+
+            // Upload gambar baru
+            $bucketName = "seminar-images";
+            $file = $request->file('gambar');
+
+            $fileName = "seminar_" . time() . "." . $file->getClientOriginalExtension();
+            $fileContent = file_get_contents($file);
+
+            $upload = Http::withHeaders([
+                'apikey' => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
+            ])
+            ->attach(
+                'file',                       // field name
+                $fileContent,                 // isi file
+                $fileName                     // nama file
+            )->post(
+                $this->supabaseStorage . '/seminar-images/' . $fileName);
+
+            if ($upload->failed()) {
+                return dd($upload->json());
+            }
+
+            // URL baru
+            $newImageUrl = $this->supabaseStorage . "/" . $bucketName . "/" . $fileName;
+        }
+
+
+        $query = <<<GRAPHQL
         mutation UpdateSeminar(
-            $seminar_id: BigInt!,
-            $nama_seminar: String!,
-            $tanggal_pelaksanaan: Date!,
-            $mulai_pendaftaran: Date!,
-            $akhir_pendaftaran: Date!,
-            $lokasi: String,
-            $pembicara: String,
-            $deskripsi: String,
-            $link_pendaftaran: String
+            \$id: ID!,
+            \$nama: String!,
+            \$tanggalPelaksanaan: Date!,
+            \$mulaiPendaftaran: Date!,
+            \$akhirPendaftaran: Date!,
+            \$lokasi: String!,
+            \$pembicara: String!,
+            \$deskripsi: String!,
+            \$link: String!,
+            \$imageUrl: String!
         ) {
             updateseminarCollection(
-                filter: { seminar_id: { eq: $seminar_id } }
                 set: {
-                    nama_seminar: $nama_seminar,
-                    tanggal_pelaksanaan: $tanggal_pelaksanaan,
-                    mulai_pendaftaran: $mulai_pendaftaran,
-                    akhir_pendaftaran: $akhir_pendaftaran,
-                    lokasi: $lokasi,
-                    pembicara: $pembicara,
-                    deskripsi: $deskripsi,
-                    link_pendaftaran: $link_pendaftaran
-                }
+                    nama_seminar: \$nama,
+                    tanggal_pelaksanaan: \$tanggalPelaksanaan,
+                    mulai_pendaftaran: \$mulaiPendaftaran,
+                    akhir_pendaftaran: \$akhirPendaftaran,
+                    lokasi: \$lokasi,
+                    pembicara: \$pembicara,
+                    deskripsi: \$deskripsi,
+                    link_pendaftaran: \$link
+                    image_url: \$imageUrl
+                },
+                filter: { seminar_id: { eq: \$id } }
             ) {
                 affectedCount
             }
         }
         GRAPHQL;
 
-        $variables = $request->all();
-        $variables['seminar_id'] = (int)$id;
+        $response = Http::withHeaders([
+            'apikey'        => $this->supabaseKey,
+            'Authorization' => 'Bearer ' . $this->supabaseKey,
+            'Content-Type'  => 'application/json'
+        ])->post($this->supabaseUrl, [
+            'query' => $query,
+            'variables' => [
+                'id'                  => $id,
+                'nama'                => $nama,
+                'tanggalPelaksanaan'  => $tanggalPelaksanaan,
+                'mulaiPendaftaran'    => $mulaiPendaftaran,
+                'akhirPendaftaran'    => $akhirPendaftaran,
+                'lokasi'              => $lokasi,
+                'pembicara'           => $pembicara,
+                'deskripsi'           => $deskripsi,
+                'link'                => $link,
+                'imageUrl'           => $newImageUrl,
+            ]
+        ]);
+
+        if ($response->failed()) {
+            return dd($response->json());
+        }
+
+        return redirect()->back()->with('success', 'Seminar berhasil diperbarui!');
+    }
+
+    private function deleteFromStorage($imageUrl, $bucket)
+    {
+        if (!$imageUrl) return;
+        $bucketName = $bucket;
+
+        dd("Deleting image from storage: $imageUrl");
+
+        $fileName = basename($imageUrl);
+
+        $url = $this->supabaseStorage . "/$bucketName/$fileName";
 
         $response = Http::withHeaders([
             'apikey' => $this->supabaseKey,
             'Authorization' => 'Bearer ' . $this->supabaseKey,
-            'Content-Type' => 'application/json'
-        ])->post($this->supabaseUrl, [
-            'query' => $mutation,
-            'variables' => $variables
-        ]);
+            'Content-Type' => 'application/json',
+        ])->delete($url);
+        dd($url, $response->json());
 
-        if ($response->failed() || isset($response->json()['errors'])) {
-            return back()->with('error', 'Failed to update seminar: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'));
-        }
-
-        return back()->with('success', 'Seminar updated successfully!');
+        return $response;
     }
 
-    public function deleteSeminar($id)
+
+    public function deleteSeminar(Request $request)
     {
-        $mutation = <<<'GRAPHQL'
-        mutation DeleteSeminar($seminar_id: BigInt!) {
-            deleteFromseminarCollection(filter: { seminar_id: { eq: $seminar_id } }) {
+        $id = $request->id;
+        $imageUrl = $request->image_url;
+
+        if ($imageUrl) {
+            $this->deleteFromStorage($imageUrl, 'seminar-images');
+        }
+    
+        $query = <<<GRAPHQL
+        mutation DeleteSeminar(\$id: ID!) {
+            deleteFromseminarCollection(
+                filter: { seminar_id: { eq: \$id } }
+            ) {
                 affectedCount
             }
         }
         GRAPHQL;
 
         $response = Http::withHeaders([
-            'apikey' => $this->supabaseKey,
+            'apikey'        => $this->supabaseKey,
             'Authorization' => 'Bearer ' . $this->supabaseKey,
-            'Content-Type' => 'application/json'
+            'Content-Type'  => 'application/json'
         ])->post($this->supabaseUrl, [
-            'query' => $mutation,
-            'variables' => ['seminar_id' => (int)$id]
+            'query' => $query,
+            'variables' => [ 'id' => $id ]
         ]);
 
-        if ($response->failed() || isset($response->json()['errors'])) {
-            return back()->with('error', 'Failed to delete seminar: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'));
+        if ($response->failed()) {
+            return dd($response->json());
         }
 
-        return back()->with('success', 'Seminar deleted successfully!');
+        return redirect()->back()->with('success', 'Seminar berhasil dihapus!');
     }
 
     // BEASISWA CRUD
     public function storeBeasiswa(Request $request)
     {
+        // dd($request->all());
+
+        // Validasi input
         $request->validate([
-            'nama_beasiswa' => 'required|string|max:200',
-            'jenjang_beasiswa' => 'nullable|string|max:100',
-            'mulai_pendaftaran' => 'required|date',
-            'akhir_pendaftaran' => 'required|date',
-            'syarat_beasiswa' => 'nullable|string',
-            'benefit_beasiswa' => 'nullable|string',
-            'pemberi_beasiswa' => 'nullable|string|max:200',
-            'link_pendaftaran' => 'nullable|string|max:500',
+            'nama'                => 'required|string|max:255',
+            'jenjang' => 'required|string|max:100',
+            'mulai_pendaftaran'   => 'required|date',
+            'akhir_pendaftaran'   => 'required|date',
+            'syarat'              => 'required|string|max:255',
+            'benefit'           => 'required|string|max:255',
+            'pemberi'           => 'required|string',
+            'link'                => 'required|string',
+            'gambar'              => 'nullable|image|max:2048',
         ]);
 
-        $mutation = <<<'GRAPHQL'
+        $imageUrl = null;
+
+        //upload ke supabase storage jika ada gambar
+        if ($request->hasFile('gambar')) {
+
+            $bucketName = 'beasiswa_images';
+
+            $file = $request->file('gambar');
+            $fileName = 'beasiswa_' . time() . '.' . $file->getClientOriginalExtension();
+            $fileContent = file_get_contents($file);
+
+            // Upload ke Supabase Storage
+            $upload = Http::withHeaders([
+                'apikey' => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
+            ])
+            ->attach(
+                'file',                       // field name
+                $fileContent,                 // isi file
+                $fileName                     // nama file
+            )
+            ->post($this->supabaseStorage . '/beasiswa_images/' . $fileName);
+
+            if ($upload->failed()) {
+                return dd($upload->json());
+            }
+
+            // URL file
+            $imageUrl = $this->supabaseStorage . '/' . $bucketName . '/' . $fileName;
+        }
+
+        // Ambil data request
+        $nama                = $request->nama;
+        $jenjangBeasiswa  = $request->jenjang;
+        $mulaiPendaftaran    = $request->mulai_pendaftaran;
+        $akhirPendaftaran    = $request->akhir_pendaftaran;
+        $syarat              = $request->syarat;
+        $benefit           = $request->benefit;
+        $pemberi           = $request->pemberi;
+        $link                = $request->link;
+
+        // GraphQL Mutation
+        $query = <<<GRAPHQL
         mutation InsertBeasiswa(
-            $nama_beasiswa: String!,
-            $jenjang_beasiswa: String,
-            $mulai_pendaftaran: Date!,
-            $akhir_pendaftaran: Date!,
-            $syarat_beasiswa: String,
-            $benefit_beasiswa: String,
-            $pemberi_beasiswa: String,
-            $link_pendaftaran: String
+            \$nama: String!,
+            \$jenjangBeasiswa: String!,
+            \$mulaiPendaftaran: Date!,
+            \$akhirPendaftaran: Date!,
+            \$syarat: String!,
+            \$benefit: String!,
+            \$pemberi: String!,
+            \$link: String!,
+            \$gambar: String
         ) {
             insertIntobeasiswaCollection(
                 objects: {
-                    nama_beasiswa: $nama_beasiswa,
-                    jenjang_beasiswa: $jenjang_beasiswa,
-                    mulai_pendaftaran: $mulai_pendaftaran,
-                    akhir_pendaftaran: $akhir_pendaftaran,
-                    syarat_beasiswa: $syarat_beasiswa,
-                    benefit_beasiswa: $benefit_beasiswa,
-                    pemberi_beasiswa: $pemberi_beasiswa,
-                    link_pendaftaran: $link_pendaftaran
+                    nama_beasiswa: \$nama,
+                    jenjang_beasiswa: \$jenjangBeasiswa,
+                    mulai_pendaftaran: \$mulaiPendaftaran,
+                    akhir_pendaftaran: \$akhirPendaftaran,
+                    syarat_beasiswa: \$syarat,
+                    benefit_beasiswa: \$benefit,
+                    pemberi_beasiswa: \$pemberi,
+                    link_pendaftaran: \$link,
+                    image_url: \$gambar
                 }
             ) {
                 affectedCount
-                records {
-                    beasiswa_id
-                    nama_beasiswa
-                }
             }
         }
         GRAPHQL;
 
+        // Kirim ke Supabase
         $response = Http::withHeaders([
-            'apikey' => $this->supabaseKey,
+            'apikey'        => $this->supabaseKey,
             'Authorization' => 'Bearer ' . $this->supabaseKey,
-            'Content-Type' => 'application/json'
+            'Content-Type'  => 'application/json'
         ])->post($this->supabaseUrl, [
-            'query' => $mutation,
-            'variables' => $request->all()
+            'query' => $query,
+            'variables' => [
+                'nama'                => $nama,
+                'jenjangBeasiswa'  => $jenjangBeasiswa,
+                'mulaiPendaftaran'    => $mulaiPendaftaran,
+                'akhirPendaftaran'    => $akhirPendaftaran,
+                'syarat'              => $syarat,
+                'benefit'           => $benefit,
+                'pemberi'           => $pemberi,
+                'link'                => $link,
+                'gambar'              => $imageUrl ?? '',
+            ]
         ]);
 
-        if ($response->failed() || isset($response->json()['errors'])) {
-            return back()->with('error', 'Failed to create beasiswa: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'));
+        // Jika error
+        if ($response->failed()) {
+            return dd($response->json());
         }
 
-        return back()->with('success', 'Beasiswa created successfully!');
+        return back()->with('success', 'beasiswa berhasil ditambahkan!');
     }
 
-    public function updateBeasiswa(Request $request, $id)
+    public function updateBeasiswa(Request $request)
     {
+        // dd($request->all());
+        // Validasi
         $request->validate([
-            'nama_beasiswa' => 'required|string|max:200',
-            'jenjang_beasiswa' => 'nullable|string|max:100',
-            'mulai_pendaftaran' => 'required|date',
-            'akhir_pendaftaran' => 'required|date',
-            'syarat_beasiswa' => 'nullable|string',
-            'benefit_beasiswa' => 'nullable|string',
-            'pemberi_beasiswa' => 'nullable|string|max:200',
-            'link_pendaftaran' => 'nullable|string|max:500',
+            'id'                  => 'required|integer',
+            'nama'                => 'required|string|max:255',
+            'jenjang'             => 'required|string|max:100',
+            'mulai_pendaftaran'   => 'required|date',
+            'akhir_pendaftaran'   => 'required|date',
+            'syarat'              => 'required|string|max:255',
+            'benefit'             => 'required|string|max:255',
+            'pemberi'             => 'required|string',
+            'link'                => 'required|string',
+            'gambar'              => 'nullable|image|max:2048', // <--- validasi gambar
+            'old_image'           => 'nullable|string',         // <--- gambar lama
+            
         ]);
 
-        $mutation = <<<'GRAPHQL'
+        // Ambil variabel
+        $id                 = $request->id;
+        $nama               = $request->nama;
+        $jenjang            = $request->jenjang;
+        $mulaiPendaftaran   = $request->mulai_pendaftaran;
+        $akhirPendaftaran   = $request->akhir_pendaftaran;
+        $syarat             = $request->syarat;
+        $benefit            = $request->benefit;
+        $pemberi            = $request->pemberi;
+        $link               = $request->link;
+
+        $newImageUrl = $request->old_image;
+
+        if ($request->hasFile('gambar')) {
+
+            // Hapus gambar lama dari storage Supabase
+            if ($request->old_image) {
+                $this->deleteFromStorage($request->old_image, 'beasiswa_images');
+            }
+
+            // Upload gambar baru
+            $bucketName = "beasiswa_images";
+            $file = $request->file('gambar');
+
+            $fileName = "beasiswa_" . time() . "." . $file->getClientOriginalExtension();
+            $fileContent = file_get_contents($file);
+
+            $upload = Http::withHeaders([
+                'apikey' => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
+            ])
+            ->attach(
+                'file',                       // field name
+                $fileContent,                 // isi file
+                $fileName                     // nama file
+            )->post(
+                $this->supabaseStorage . '/beasiswa_images/' . $fileName);
+
+            if ($upload->failed()) {
+                return dd($upload->json());
+            }
+
+            // URL baru
+            $newImageUrl = $this->supabaseStorage . "/" . $bucketName . "/" . $fileName;
+        }
+
+        $query = <<<GRAPHQL
         mutation UpdateBeasiswa(
-            $beasiswa_id: BigInt!,
-            $nama_beasiswa: String!,
-            $jenjang_beasiswa: String,
-            $mulai_pendaftaran: Date!,
-            $akhir_pendaftaran: Date!,
-            $syarat_beasiswa: String,
-            $benefit_beasiswa: String,
-            $pemberi_beasiswa: String,
-            $link_pendaftaran: String
+            \$id: ID!,
+            \$nama: String!,
+            \$jenjang: String!,
+            \$mulaiPendaftaran: Date!,
+            \$akhirPendaftaran: Date!,
+            \$syarat: String!,
+            \$benefit: String!,
+            \$pemberi: String!,
+            \$link: String!,
+            \$gambar: String!
         ) {
             updatebeasiswaCollection(
-                filter: { beasiswa_id: { eq: $beasiswa_id } }
                 set: {
-                    nama_beasiswa: $nama_beasiswa,
-                    jenjang_beasiswa: $jenjang_beasiswa,
-                    mulai_pendaftaran: $mulai_pendaftaran,
-                    akhir_pendaftaran: $akhir_pendaftaran,
-                    syarat_beasiswa: $syarat_beasiswa,
-                    benefit_beasiswa: $benefit_beasiswa,
-                    pemberi_beasiswa: $pemberi_beasiswa,
-                    link_pendaftaran: $link_pendaftaran
-                }
+                    nama_beasiswa: \$nama,
+                    jenjang_beasiswa: \$jenjang,
+                    mulai_pendaftaran: \$mulaiPendaftaran,
+                    akhir_pendaftaran: \$akhirPendaftaran,
+                    syarat_beasiswa: \$syarat,
+                    benefit_beasiswa: \$benefit,
+                    pemberi_beasiswa: \$pemberi,
+                    link_pendaftaran: \$link,
+                    image_url: \$gambar
+                },
+                filter: { beasiswa_id: { eq: \$id } }
             ) {
                 affectedCount
             }
         }
         GRAPHQL;
 
-        $variables = $request->all();
-        $variables['beasiswa_id'] = (int)$id;
-
         $response = Http::withHeaders([
-            'apikey' => $this->supabaseKey,
+            'apikey'        => $this->supabaseKey,
             'Authorization' => 'Bearer ' . $this->supabaseKey,
-            'Content-Type' => 'application/json'
+            'Content-Type'  => 'application/json'
         ])->post($this->supabaseUrl, [
-            'query' => $mutation,
-            'variables' => $variables
+            'query' => $query,
+            'variables' => [
+                'id'                => $id,
+                'nama'              => $nama,
+                'jenjang'           => $jenjang,
+                'mulaiPendaftaran'  => $mulaiPendaftaran,
+                'akhirPendaftaran'  => $akhirPendaftaran,
+                'syarat'            => $syarat,
+                'benefit'           => $benefit,
+                'pemberi'           => $pemberi,
+                'link'              => $link,
+                'gambar'            => $newImageUrl,
+            ]
         ]);
 
-        if ($response->failed() || isset($response->json()['errors'])) {
-            return back()->with('error', 'Failed to update beasiswa: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'));
+        if ($response->failed()) {
+            return dd($response->json());
         }
 
-        return back()->with('success', 'Beasiswa updated successfully!');
+        return redirect()->back()->with('success', 'Beasiswa berhasil diperbarui!');
     }
 
-    public function deleteBeasiswa($id)
+    public function deleteBeasiswa(Request $request)
     {
-        $mutation = <<<'GRAPHQL'
-        mutation DeleteBeasiswa($beasiswa_id: BigInt!) {
-            deleteFrombeasiswaCollection(filter: { beasiswa_id: { eq: $beasiswa_id } }) {
+        $id = $request->id;
+        $imageUrl = $request->image_url;
+
+        if ($imageUrl) {
+            $this->deleteFromStorage($imageUrl, 'beasiswa-images');
+        }
+    
+        $query = <<<GRAPHQL
+        mutation DeleteBeasiswa(\$id: ID!) {
+            deleteFrombeasiswaCollection(
+                filter: { beasiswa_id: { eq: \$id } }
+            ) {
                 affectedCount
             }
         }
         GRAPHQL;
 
         $response = Http::withHeaders([
-            'apikey' => $this->supabaseKey,
+            'apikey'        => $this->supabaseKey,
             'Authorization' => 'Bearer ' . $this->supabaseKey,
-            'Content-Type' => 'application/json'
+            'Content-Type'  => 'application/json'
         ])->post($this->supabaseUrl, [
-            'query' => $mutation,
-            'variables' => ['beasiswa_id' => (int)$id]
+            'query' => $query,
+            'variables' => [ 'id' => $id ]
         ]);
 
-        if ($response->failed() || isset($response->json()['errors'])) {
-            return back()->with('error', 'Failed to delete beasiswa: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'));
+        if ($response->failed()) {
+            return dd($response->json());
         }
 
-        return back()->with('success', 'Beasiswa deleted successfully!');
+        return redirect()->back()->with('success', 'Beasiswa berhasil dihapus!');
     }
 
     // LOMBA CRUD
     public function storeLomba(Request $request)
     {
+        // dd($request->all());
+
+        // Validasi input
         $request->validate([
-            'nama_lomba' => 'required|string|max:200',
+            'nama'                => 'required|string|max:255',
             'tanggal_pelaksanaan' => 'required|date',
-            'mulai_pendaftaran' => 'required|date',
-            'akhir_pendaftaran' => 'required|date',
-            'lokasi' => 'nullable|string|max:255',
-            'kategori_lomba' => 'nullable|string|max:100',
-            'deskripsi' => 'nullable|string',
-            'penyelenggara' => 'nullable|string|max:200',
-            'link_pendaftaran' => 'nullable|string|max:500',
+            'mulai_pendaftaran'   => 'required|date',
+            'akhir_pendaftaran'   => 'required|date',
+            'lokasi'              => 'required|string|max:255',
+            'kategori'            => 'required|string|max:255',
+            'deskripsi'           => 'required|string',
+            'penyelenggara'       => 'required|string',
+            'link'                => 'required|string',
+            'gambar'              => 'nullable|image|max:2048',
         ]);
 
-        $mutation = <<<'GRAPHQL'
+        $imageUrl = null;
+
+        //upload ke supabase storage jika ada gambar
+        if ($request->hasFile('gambar')) {
+
+            $bucketName = 'lomba_images';
+
+            $file = $request->file('gambar');
+            $fileName = 'lomba_' . time() . '.' . $file->getClientOriginalExtension();
+            $fileContent = file_get_contents($file);
+
+            // Upload ke Supabase Storage
+            $upload = Http::withHeaders([
+                'apikey' => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
+            ])
+            ->attach(
+                'file',                       // field name
+                $fileContent,                 // isi file
+                $fileName                     // nama file
+            )
+            ->post($this->supabaseStorage . '/lomba_images/' . $fileName);
+
+            if ($upload->failed()) {
+                return dd($upload->json());
+            }
+
+            // URL file
+            $imageUrl = $this->supabaseStorage . '/' . $bucketName . '/' . $fileName;
+        }
+
+        // Ambil data request
+        $nama                = $request->nama;
+        $tanggalPelaksanaan = $request->tanggal_pelaksanaan;
+        $mulaiPendaftaran    = $request->mulai_pendaftaran;
+        $akhirPendaftaran    = $request->akhir_pendaftaran;
+        $lokasi             = $request->lokasi;
+        $kategori           = $request->kategori;
+        $deskripsi           = $request->deskripsi;
+        $penyelenggara           = $request->penyelenggara;
+        $link                = $request->link;
+
+        // GraphQL Mutation
+        $query = <<<GRAPHQL
         mutation InsertLomba(
-            $nama_lomba: String!,
-            $tanggal_pelaksanaan: Date!,
-            $mulai_pendaftaran: Date!,
-            $akhir_pendaftaran: Date!,
-            $lokasi: String,
-            $kategori_lomba: String,
-            $deskripsi: String,
-            $penyelenggara: String,
-            $link_pendaftaran: String
+            \$nama: String!,
+            \$tanggalPelaksanaan: Date!,
+            \$mulaiPendaftaran: Date!,
+            \$akhirPendaftaran: Date!,
+            \$lokasi: String!,
+            \$kategori: String!,
+            \$deskripsi: String!,
+            \$penyelenggara: String!,
+            \$link: String!,
+            \$gambar: String
         ) {
             insertIntolombaCollection(
                 objects: {
-                    nama_lomba: $nama_lomba,
-                    tanggal_pelaksanaan: $tanggal_pelaksanaan,
-                    mulai_pendaftaran: $mulai_pendaftaran,
-                    akhir_pendaftaran: $akhir_pendaftaran,
-                    lokasi: $lokasi,
-                    kategori_lomba: $kategori_lomba,
-                    deskripsi: $deskripsi,
-                    penyelenggara: $penyelenggara,
-                    link_pendaftaran: $link_pendaftaran
+                    nama_lomba: \$nama,
+                    tanggal_pelaksanaan: \$tanggalPelaksanaan,
+                    mulai_pendaftaran: \$mulaiPendaftaran,
+                    akhir_pendaftaran: \$akhirPendaftaran,
+                    lokasi: \$lokasi,
+                    kategori_lomba: \$kategori,
+                    deskripsi: \$deskripsi,
+                    penyelenggara: \$penyelenggara,
+                    link_pendaftaran: \$link,
+                    image_url: \$gambar
                 }
             ) {
                 affectedCount
-                records {
-                    lomba_id
-                    nama_lomba
-                }
             }
         }
         GRAPHQL;
 
+        // Kirim ke Supabase
         $response = Http::withHeaders([
-            'apikey' => $this->supabaseKey,
+            'apikey'        => $this->supabaseKey,
             'Authorization' => 'Bearer ' . $this->supabaseKey,
-            'Content-Type' => 'application/json'
+            'Content-Type'  => 'application/json'
         ])->post($this->supabaseUrl, [
-            'query' => $mutation,
-            'variables' => $request->all()
+            'query' => $query,
+            'variables' => [
+                'nama'                => $nama,
+                'tanggalPelaksanaan'  => $tanggalPelaksanaan,
+                'mulaiPendaftaran'    => $mulaiPendaftaran,
+                'akhirPendaftaran'    => $akhirPendaftaran,
+                'lokasi'              => $lokasi,
+                'kategori'            => $kategori,
+                'deskripsi'           => $deskripsi,
+                'penyelenggara'       => $penyelenggara,
+                'link'                => $link,
+                'gambar'              => $imageUrl ?? '',
+            ]
         ]);
 
-        if ($response->failed() || isset($response->json()['errors'])) {
-            return back()->with('error', 'Failed to create lomba: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'));
+        // Jika error
+        if ($response->failed()) {
+            return dd($response->json());
         }
 
-        return back()->with('success', 'Lomba created successfully!');
+        return back()->with('success', 'Lomba berhasil ditambahkan!');
     }
 
-    public function updateLomba(Request $request, $id)
+    public function updateLomba(Request $request)
     {
+        // dd($request->all());
+        // Validasi
         $request->validate([
-            'nama_lomba' => 'required|string|max:200',
+            'id'                  => 'required|integer',
+            'nama'                => 'required|string|max:255',
             'tanggal_pelaksanaan' => 'required|date',
-            'mulai_pendaftaran' => 'required|date',
-            'akhir_pendaftaran' => 'required|date',
-            'lokasi' => 'nullable|string|max:255',
-            'kategori_lomba' => 'nullable|string|max:100',
-            'deskripsi' => 'nullable|string',
-            'penyelenggara' => 'nullable|string|max:200',
-            'link_pendaftaran' => 'nullable|string|max:500',
+            'mulai_pendaftaran'   => 'required|date',
+            'akhir_pendaftaran'   => 'required|date',
+            'lokasi'              => 'required|string|max:255',
+            'kategori'            => 'required|string|max:255',
+            'deskripsi'           => 'required|string|max:255',
+            'penyelenggara'       => 'required|string|max:255',
+            'link'                => 'required|string',
+            'gambar'              => 'nullable|image|max:2048', // <--- validasi gambar
+            'old_image'           => 'nullable|string',         // <--- gambar lama
+            
         ]);
 
-        $mutation = <<<'GRAPHQL'
+        // Ambil variabel
+        $id                 = $request->id;
+        $nama               = $request->nama;
+        $tanggalPelaksanaan= $request->tanggal_pelaksanaan;
+        $mulaiPendaftaran   = $request->mulai_pendaftaran;
+        $akhirPendaftaran   = $request->akhir_pendaftaran;
+        $lokasi             = $request->lokasi;
+        $kategori           = $request->kategori;
+        $deskripsi          = $request->deskripsi;
+        $penyelenggara      = $request->penyelenggara;
+        $link               = $request->link;
+
+        $newImageUrl = $request->old_image;
+
+        if ($request->hasFile('gambar')) {
+
+            // Hapus gambar lama dari storage Supabase
+            if ($request->old_image) {
+                $this->deleteFromStorage($request->old_image, 'lomba_images');
+            }
+
+            // Upload gambar baru
+            $bucketName = "lomba_images";
+            $file = $request->file('gambar');
+
+            $fileName = "lomba_" . time() . "." . $file->getClientOriginalExtension();
+            $fileContent = file_get_contents($file);
+
+            $upload = Http::withHeaders([
+                'apikey' => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
+            ])
+            ->attach(
+                'file',                       // field name
+                $fileContent,                 // isi file
+                $fileName                     // nama file
+            )->post(
+                $this->supabaseStorage . '/lomba_images/' . $fileName);
+
+            if ($upload->failed()) {
+                return dd($upload->json());
+            }
+
+            // URL baru
+            $newImageUrl = $this->supabaseStorage . "/" . $bucketName . "/" . $fileName;
+        }
+
+        $query = <<<GRAPHQL
         mutation UpdateLomba(
-            $lomba_id: BigInt!,
-            $nama_lomba: String!,
-            $tanggal_pelaksanaan: Date!,
-            $mulai_pendaftaran: Date!,
-            $akhir_pendaftaran: Date!,
-            $lokasi: String,
-            $kategori_lomba: String,
-            $deskripsi: String,
-            $penyelenggara: String,
-            $link_pendaftaran: String
+            \$id: ID!,
+            \$nama: String!,
+            \$tanggalPelaksanaan: Date!,
+            \$mulaiPendaftaran: Date!,
+            \$akhirPendaftaran: Date!,
+            \$lokasi: String!,
+            \$kategori: String!,
+            \$deskripsi: String!,
+            \$penyelenggara: String!,
+            \$link: String!,
+            \$gambar: String!
         ) {
             updatelombaCollection(
-                filter: { lomba_id: { eq: $lomba_id } }
                 set: {
-                    nama_lomba: $nama_lomba,
-                    tanggal_pelaksanaan: $tanggal_pelaksanaan,
-                    mulai_pendaftaran: $mulai_pendaftaran,
-                    akhir_pendaftaran: $akhir_pendaftaran,
-                    lokasi: $lokasi,
-                    kategori_lomba: $kategori_lomba,
-                    deskripsi: $deskripsi,
-                    penyelenggara: $penyelenggara,
-                    link_pendaftaran: $link_pendaftaran
-                }
+                    nama_lomba: \$nama,
+                    tanggal_pelaksanaan: \$tanggalPelaksanaan,
+                    mulai_pendaftaran: \$mulaiPendaftaran,
+                    akhir_pendaftaran: \$akhirPendaftaran,
+                    lokasi: \$lokasi,
+                    kategori_lomba: \$kategori,
+                    deskripsi: \$deskripsi,
+                    penyelenggara: \$penyelenggara,
+                    link_pendaftaran: \$link,
+                    image_url: \$gambar
+                },
+                filter: { lomba_id: { eq: \$id } }
             ) {
                 affectedCount
             }
         }
         GRAPHQL;
 
-        $variables = $request->all();
-        $variables['lomba_id'] = (int)$id;
-
         $response = Http::withHeaders([
-            'apikey' => $this->supabaseKey,
+            'apikey'        => $this->supabaseKey,
             'Authorization' => 'Bearer ' . $this->supabaseKey,
-            'Content-Type' => 'application/json'
+            'Content-Type'  => 'application/json'
         ])->post($this->supabaseUrl, [
-            'query' => $mutation,
-            'variables' => $variables
+            'query' => $query,
+            'variables' => [
+                'id'                => $id,
+                'nama'              => $nama,
+                'tanggalPelaksanaan'=> $tanggalPelaksanaan,
+                'mulaiPendaftaran'  => $mulaiPendaftaran,
+                'akhirPendaftaran'  => $akhirPendaftaran,
+                'lokasi'            => $lokasi,
+                'kategori'          => $kategori,
+                'deskripsi'         => $deskripsi,
+                'penyelenggara'     => $penyelenggara,
+                'link'              => $link,
+                'gambar'            => $newImageUrl,
+            ]
         ]);
 
-        if ($response->failed() || isset($response->json()['errors'])) {
-            return back()->with('error', 'Failed to update lomba: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'));
+        if ($response->failed()) {
+            return dd($response->json());
         }
 
-        return back()->with('success', 'Lomba updated successfully!');
+        return redirect()->back()->with('success', 'Lomba berhasil diperbarui!');
     }
 
-    public function deleteLomba($id)
+    public function deleteLomba(Request $request)
     {
-        $mutation = <<<'GRAPHQL'
-        mutation DeleteLomba($lomba_id: BigInt!) {
-            deleteFromlombaCollection(filter: { lomba_id: { eq: $lomba_id } }) {
+        $id = $request->id;
+        $imageUrl = $request->image_url;
+
+        if ($imageUrl) {
+            $this->deleteFromStorage($imageUrl, 'lomba-images');
+        }
+    
+        $query = <<<GRAPHQL
+        mutation DeleteLomba(\$id: ID!) {
+            deleteFromlombaCollection(
+                filter: { lomba_id: { eq: \$id } }
+            ) {
                 affectedCount
             }
         }
         GRAPHQL;
 
         $response = Http::withHeaders([
-            'apikey' => $this->supabaseKey,
+            'apikey'        => $this->supabaseKey,
             'Authorization' => 'Bearer ' . $this->supabaseKey,
-            'Content-Type' => 'application/json'
+            'Content-Type'  => 'application/json'
         ])->post($this->supabaseUrl, [
-            'query' => $mutation,
-            'variables' => ['lomba_id' => (int)$id]
+            'query' => $query,
+            'variables' => [ 'id' => $id ]
         ]);
 
-        if ($response->failed() || isset($response->json()['errors'])) {
-            return back()->with('error', 'Failed to delete lomba: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'));
+        if ($response->failed()) {
+            return dd($response->json());
         }
 
-        return back()->with('success', 'Lomba deleted successfully!');
+        return redirect()->back()->with('success', 'Lomba berhasil dihapus!');
     }
 }
-
-
-

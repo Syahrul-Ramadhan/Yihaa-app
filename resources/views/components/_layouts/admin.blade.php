@@ -16,16 +16,17 @@
     @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
+
+    <script src="//unpkg.com/alpinejs" defer></script>
+    <style>[x-cloak] { display: none}</style>
 </head>
 
-<body class="bg-[#020C0D]">
-
-    <div class="flex min-h-screen">
+<body class="min-h-screen flex text-white bg-gradient-to-l from-[#163F44] to-[#020C0D]" x-data="{ open: true }">
         <x-_ui.admin.sidebar />
-        <main class="flex-2">
+        
+        <main class="flex-1 p-6 overflow-y-auto transition-all duration-300" :class="open ? 'ml-64' : 'ml-20'">
             @yield('content')
         </main>
-    </div>
 </body>
 
 </html>

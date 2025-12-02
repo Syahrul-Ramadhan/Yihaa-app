@@ -32,13 +32,5 @@ Route::middleware(['auth.check', 'admin'])->group(function () {
         Route::delete('/lomba/{id}', [AdminEventController::class, 'deleteLomba'])->name('delete.lomba');
     });
     
-    // Material Management Routes
-    Route::prefix('materials')->name('materials.')->group(function () {
-        Route::get('/', [AdminMaterialController::class, 'index'])->name('index');
-        Route::post('/', [AdminMaterialController::class, 'store'])->name('store');
-        Route::put('/{id}', [AdminMaterialController::class, 'update'])->name('update');
-        Route::delete('/{id}', [AdminMaterialController::class, 'destroy'])->name('delete');
-        Route::post('/{id}/approve', [AdminMaterialController::class, 'approve'])->name('approve');
-        Route::post('/{id}/reject', [AdminMaterialController::class, 'reject'])->name('reject');
-    });
+
 });

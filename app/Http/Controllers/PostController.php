@@ -11,29 +11,21 @@ class PostController extends Controller
 {
     public function index(Request $request)
     {
-        // 1. Tangkap input pencarian
         $search = $request->input('search');
+        $filter = null;
 
-        $filter = null; // Default: tidak ada filter
         if ($search) {
             $filter = [
-                'caption' => [
-                    'ilike' => '%' . $search . '%'
-                ]
+                'caption' => [ 'ilike' => '%' . $search . '%' ]
             ];
         }
 
-        // 2. Query GraphQL - PERBAIKAN FINAL (KEMBALI KE postsCollection)
         $query = <<<'GRAPHQL'
         query($filter: postsFilter) {
-            
-            # ▼▼▼ UBAH KEMBALI KE 'postsCollection' ▼▼▼
+
             postsCollection(
-                filter: $filter, 
-                
-                # ▼ SINTAKS 'orderBy' YANG BENAR ▼
+                filter: $filter,
                 orderBy: [{ created_at: DescNullsLast }]
-            
             ) {
                 edges {
                     node {
@@ -42,8 +34,32 @@ class PostController extends Controller
                         image_url
                         created_at
                         uploaded_by
-                        
-                        # --- RELASI KE USERS ---
+                        users {
+                            name
+                            avatar_url
+                        }
+                    }
+                }
+            }
+
+            likes: likesCollection {
+                edges {
+                    node {
+                        like_id
+                        post_id
+                        user_id
+                    }
+                }
+            }
+
+            comments: commentsCollection {
+                edges {
+                    node {
+                        comment_id
+                        post_id
+                        comment_text
+                        parent_comment_id
+                        user_id
                         users {
                             name
                             avatar_url
@@ -54,46 +70,80 @@ class PostController extends Controller
         }
         GRAPHQL;
 
+        $url = rtrim(env('SUPABASE_URL'), '/');
+
         $response = Http::withHeaders([
             'apikey' => env('SUPABASE_SERVICE_KEY'),
             'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
             'Content-Type' => 'application/json',
-        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+        ])->post($url . '/graphql/v1', [
             'query' => $query,
-            'variables' => [
-                'filter' => $filter
-            ]
+            'variables' => ['filter' => $filter]
         ]);
 
         if ($response->failed()) {
-            dd('Error HTTP Gagal: ' . (string) $response->body());
+            dd('Error HTTP: ' . $response->body());
         }
-        
-        // ▼▼▼ BIARKAN INI TETAP ADA SAMPAI BERHASIL ▼▼▼
-        if ($response->json('errors')) {
-             dd('Error payload GraphQL: ', $response->json('errors'));
-        }
-        
-        // Ambil node data
-        $edges = $response->json('data.postsCollection.edges') ?? [];
 
-        // Ubah ke bentuk array Laravel-friendly
-        $posts = collect($edges)->map(function ($edge) {
-            $node = $edge['node'];
+        if ($response->json('errors')) {
+            dd('GraphQL Error: ', $response->json('errors'));
+        }
+
+        $data = $response->json('data');
+        $userId = session('user_id');
+        if (!$userId) {
+            return back()->with('error', 'Please login first');
+        }
+
+        // ================================
+        // GROUP LIKES PER POST
+        // ================================
+        $likesIndexed = collect($data['likes']['edges'])
+        ->groupBy('node.post_id')
+        ->map(fn($g) => $g->map(fn($l) => $l['node']));
+        
+        $likesGrouped = $likesIndexed->map(fn($g) => count($g));
+        // ================================
+        // GROUP COMMENTS PER POST + DETAIL
+        // ================================
+        $commentsGrouped = collect($data['comments']['edges'])
+            ->groupBy('node.post_id')
+            ->map(fn($g) => $g->map(fn($c) => $c['node']));
+
+        // ================================
+        // MAP POSTS
+        // ================================
+        $posts = collect($data['postsCollection']['edges'])->map(function ($edge) use ($likesGrouped, $commentsGrouped, $likesIndexed, $userId) {
+            $post = $edge['node'];
+            $id = $post['post_id'];
+
+            $isLiked = false;
+
+            if (isset($likesIndexed[$id])) {
+                $isLiked = $likesIndexed[$id]->contains(function ($like) use ($userId) {
+                    return $like['user_id'] == $userId;
+                });
+            }
+
             return [
-                'post_id' => $node['post_id'],
-                'caption' => $node['caption'],
-                'image_url' => $node['image_url'],
-                'created_at' => $node['created_at'],
-                'uploaded_by' => $node['uploaded_by'], // Tambahkan ini untuk validasi delete
-                'uploader_name' => $node['users']['name'] ?? 'Unknown',
-                'uploader_avatar' => $node['users']['avatar_url'] ?? null,
-                'likes_count' => 0, // Default karena tabel likes belum ada
-                'comments_count' => 0, // Default karena tabel comments belum ada
+                'post_id' => $id,
+                'caption' => $post['caption'],
+                'image_url' => $post['image_url'],
+                'created_at' => $post['created_at'],
+                'uploaded_by' => $post['uploaded_by'],
+                'uploader_name' => $post['users']['name'] ?? 'Unknown',
+                'uploader_avatar' => $post['users']['avatar_url'] ?? null,
+
+                'likes_count' => $likesGrouped[$id] ?? 0,
+                'is_liked'    => $isLiked,
+                
+                'comments_count' => isset($commentsGrouped[$id]) ? count($commentsGrouped[$id]) : 0,
+
+                // daftar komentar dipakai untuk pop-up
+                'comments' => $commentsGrouped[$id] ?? [],
             ];
         });
 
-        // Get team recommendations
         $teams = \App\Http\Controllers\TeamController::getTeamRecommendations(20);
 
         return view('pages.users.home', compact('posts', 'teams'));
@@ -240,5 +290,18 @@ class PostController extends Controller
         }
 
         return redirect()->route('posts.index')->with('success', 'Post deleted successfully!');
+    }
+
+    public function show($id)
+    {
+        // Ambil post utama
+        $post = Post::with([
+            'user',
+            'comments' => function($q) {
+                $q->whereNull('parent_id')->with('user', 'replies.user');
+            }
+        ])->findOrFail($id);
+
+        return view('posts.show', compact('post'));
     }
 }

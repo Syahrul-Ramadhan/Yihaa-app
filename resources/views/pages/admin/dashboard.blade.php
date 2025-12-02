@@ -120,14 +120,14 @@
             <thead>
                 <tr class="border-b border-[#1CC8EE]">
                     <th class="py-2 px-4 text-left">Nama Tim</th>
-                    <th class="py-2 px-4 text-left">Anggota</th>
+                    <th class="py-2 px-4 text-center">Anggota</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($teamsList ?? [] as $team)
                 <tr class="border-b">
                     <td class="py-2 px-4">{{ $team['team_name'] ?? '-' }}</td>
-                    <td class="py-2 px-4">{{ Str::limit($team['team_desc'] ?? '-', 50) }}</td>
+                    <td class="py-2 px-4 text-center">{{ $team['member_count']  }}</td>
                 </tr>
                 @endforeach
             </tbody>

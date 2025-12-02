@@ -133,7 +133,7 @@ class TeamController extends Controller
         // Upload logo to Supabase Storage if provided
         if ($request->hasFile('team_logo')) {
             $file = $request->file('team_logo');
-            $bucketName = 'post-images'; // Use existing bucket
+            $bucketName = 'team-icons'; // Use existing bucket
             $fileName = 'team_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
 
             try {

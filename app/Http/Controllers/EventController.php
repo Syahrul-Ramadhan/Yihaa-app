@@ -11,12 +11,24 @@ class EventController extends Controller
      * Show seminar listing page. We fetch seminar records from Supabase GraphQL.
      * Fields requested follow the schema you provided.
      */
-    public function viewSeminar()
+    public function viewSeminar(Request $request)
     {
+        $search = $request->input('search');
+        $filter = null;
+
+        if ($search) {
+            $filter = [
+                'nama_seminar' => [ 'ilike' => '%' . $search . '%' ]
+            ];
+        }
+
         // GraphQL query to fetch seminars
         $query = <<<'GRAPHQL'
-        query {
-            seminarCollection {
+        query ($filter: seminarFilter) {
+            seminarCollection (
+                filter: $filter,
+                orderBy: [{ created_at: DescNullsLast }]
+            ) {
                 edges {
                     node {
                         seminar_id
@@ -28,6 +40,7 @@ class EventController extends Controller
                         pembicara
                         deskripsi
                         link_pendaftaran
+                        image_url
                         created_at
                     }
                 }
@@ -60,11 +73,23 @@ class EventController extends Controller
     /**
      * Show beasiswa listing page. Fetch beasiswa records from Supabase GraphQL.
      */
-    public function viewBeasiswa()
+    public function viewBeasiswa(Request $request)
     {
+        $search = $request->input('search');
+        $filter = null;
+
+        if ($search) {
+            $filter = [
+                'nama_beasiswa' => [ 'ilike' => '%' . $search . '%' ]
+            ];
+        }
+
         $query = <<<'GRAPHQL'
-        query {
-            beasiswaCollection {
+        query ($filter: beasiswaFilter) {
+            beasiswaCollection (
+                filter: $filter,
+                orderBy: [{ created_at: DescNullsLast }]
+            ) {
                 edges {
                     node {
                         beasiswa_id
@@ -77,6 +102,7 @@ class EventController extends Controller
                         benefit_beasiswa
                         pemberi_beasiswa
                         link_pendaftaran
+                        image_url
                     }
                 }
             }
@@ -107,11 +133,23 @@ class EventController extends Controller
     /**
      * Show lomba listing page. Fetch lomba records from Supabase GraphQL.
      */
-    public function viewLomba()
+    public function viewLomba(Request $request)
     {
+        $search = $request->input('search');
+        $filter = null;
+
+        if ($search) {
+            $filter = [
+                'nama_beasiswa' => [ 'ilike' => '%' . $search . '%' ]
+            ];
+        }
+        
         $query = <<<'GRAPHQL'
-        query {
-            lombaCollection {
+        query ($filter: lombaFilter) {
+            lombaCollection (
+                filter: $filter,
+                orderBy: [{ created_at: DescNullsLast }]
+            ){
                 edges {
                     node {
                         lomba_id
@@ -120,11 +158,12 @@ class EventController extends Controller
                         mulai_pendaftaran
                         akhir_pendaftaran
                         lokasi
-                        jenis_lomba
-                        jenjang_lomba
-                        deskripsi_lomba
+                        kategori_lomba
+                        deskripsi
+                        penyelenggara
                         link_pendaftaran
                         created_at
+                        image_url
                     }
                 }
             }

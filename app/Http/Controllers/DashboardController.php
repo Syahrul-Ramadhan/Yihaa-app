@@ -200,8 +200,78 @@ class DashboardController extends Controller
         return view('pages.admin.manage-event', compact('seminars', 'beasiswas', 'lombas'));
     }
 
-    public function viewevem()
+    public function viewManageMaterial()
     {
-        return view('pages.admin.dashboard');
+        $query = <<<'GRAPHQL'
+        query {
+            materialsCollection(orderBy: { created_at: DescNullsLast }) {
+                edges {
+                    node {
+                        material_id
+                        tittle
+                        description
+                        uploaded_by
+                        file_url
+                        thumbnail_url
+                        status
+                        created_at
+                        users {
+                            id
+                            name
+                            email
+                            avatar_url
+                        }
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        $response = Http::withHeaders([
+            'apikey' => $this->supabaseKey,
+            'Authorization' => 'Bearer ' . $this->supabaseKey,
+            'Content-Type' => 'application/json'
+        ])->post($this->supabaseUrl, ['query' => $query]);
+
+        $data = $response->json('data') ?? [];
+        $materials = array_map(fn($edge) => $edge['node'], $data['materialsCollection']['edges'] ?? []);
+
+        // Filter materials by status (if status field exists, otherwise treat all as pending)
+        $pending = array_filter($materials, fn($m) => ($m['status'] ?? 'pending') === 'pending');
+        $approved = array_filter($materials, fn($m) => ($m['status'] ?? 'pending') === 'approved');
+        $rejected = array_filter($materials, fn($m) => ($m['status'] ?? 'pending') === 'rejected');
+
+        return view('pages.admin.manage-materials', compact('pending', 'approved', 'rejected', 'materials'));
+    }
+
+    public function viewManageUser()
+    {
+        $query = <<<'GRAPHQL'
+        query {
+            usersCollection(orderBy: { created_at: DescNullsLast }) {
+                edges {
+                    node {
+                        id
+                        name
+                        email
+                        password
+                        role
+                        avatar_url
+                    }
+                }
+            }
+        }
+        GRAPHQL;
+
+        $response = Http::withHeaders([
+            'apikey' => $this->supabaseKey,
+            'Authorization' => 'Bearer ' . $this->supabaseKey,
+            'Content-Type' => 'application/json'
+        ])->post($this->supabaseUrl, ['query' => $query]);
+
+        $data = $response->json('data') ?? [];
+        $users = array_map(fn($edge) => $edge['node'], $data['usersCollection']['edges'] ?? []);
+
+        return view('pages.admin.manage-users', compact('users'));
     }
 }

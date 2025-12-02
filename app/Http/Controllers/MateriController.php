@@ -7,6 +7,17 @@ use Illuminate\Support\Facades\Http;
 
 class MateriController extends Controller
 {
+    protected $supabaseUrl;
+    protected $supabaseKey;
+    private $supabaseStorage;
+
+    public function __construct()
+    {
+        $this->supabaseUrl = env('SUPABASE_URL') . '/graphql/v1';
+        $this->supabaseKey = env('SUPABASE_SERVICE_KEY'); // Use service key for admin operations
+        $this->supabaseStorage = env('SUPABASE_URL') . '/storage/v1/object';
+    }
+    
     public function viewMateri()
     {
         return view('pages.materi');
@@ -14,20 +25,28 @@ class MateriController extends Controller
 
     public function index(Request $request)
     {
-        // Tangkap input pencarian
         $search = $request->input('search');
 
-        $filter = null;
+        // Filter dasar: hanya approved
+        $filter = [
+            'status' => ['eq' => 'approved']
+        ];
+
+        // Jika ada pencarian, gabungkan filter
         if ($search) {
             $filter = [
-                'or' => [
-                    ['tittle' => ['ilike' => '%' . $search . '%']],
-                    ['description' => ['ilike' => '%' . $search . '%']]
+                'and' => [
+                    ['status' => ['eq' => 'approved']],
+                    [
+                        'or' => [
+                            ['tittle' => ['ilike' => '%' . $search . '%']],
+                            ['description' => ['ilike' => '%' . $search . '%']]
+                        ]
+                    ]
                 ]
             ];
         }
 
-        // Query GraphQL untuk ambil data materials
         $query = <<<'GRAPHQL'
         query($filter: materialsFilter) {
             materialsCollection(
@@ -42,6 +61,7 @@ class MateriController extends Controller
                         uploaded_by
                         file_url
                         thumbnail_url
+                        status
                         users {
                             name
                             avatar_url
@@ -67,128 +87,154 @@ class MateriController extends Controller
             dd('Error GraphQL: ' . $response->body());
         }
 
-        
-        // Ambil node data
         $edges = $response->json('data.materialsCollection.edges') ?? [];
 
-        // Ubah ke bentuk array Laravel-friendly
         $materials = collect($edges)->map(function ($edge) {
-        $node = $edge['node'];
-        return [
-            'material_id' => $node['material_id'],
-            'tittle' => $node['tittle'],
-            'description' => $node['description'],
-            'uploaded_by' => $node['uploaded_by'],
-            'file_url' => $node['file_url'],
-            'thumbnail_url' => $node['thumbnail_url'],
-            'user' => $node['users'],
-        ];
-    });
+            $node = $edge['node'];
+            return [
+                'material_id'    => $node['material_id'],
+                'tittle'         => $node['tittle'],
+                'description'    => $node['description'],
+                'uploaded_by'    => $node['uploaded_by'],
+                'file_url'       => $node['file_url'],
+                'thumbnail_url'  => $node['thumbnail_url'],
+                'user'           => $node['users'],
+            ];
+        });
 
-        // Get team recommendations
         $teams = \App\Http\Controllers\TeamController::getTeamRecommendations(20);
 
         return view('pages.materi', compact('materials', 'teams'));
     }
 
+
     public function store(Request $request)
     {
         $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'file' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
+            'tittle' => 'required|string|max:200',
+            'description' => 'nullable|string',
+            'file' => 'nullable|file',
+            'image' => 'nullable|image',
         ]);
 
         $userId = session('user_id');
         if (!$userId) {
-            return back()->with('error', 'Please login first');
+            return back()->with('error', 'Please login first.');
         }
 
-        $thumbnailUrl = '';
+        $imageUrl = null;
+        $fileUrl  = null;
 
-        // Upload thumbnail to Supabase Storage if provided (using 'post-images' bucket)
-        if ($request->hasFile('file')) {
-            $file = $request->file('file');
-            $bucketName = 'post-images';
-            $fileName = 'material_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
 
-            // Upload to Supabase Storage using existing 'post-images' bucket
-            $uploadResponse = Http::withHeaders([
-                'apikey' => env('SUPABASE_SERVICE_KEY'),
-                'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
+        /* ================================
+        UPLOAD IMAGE (material_images)
+        ================================= */
+        if ($request->hasFile('image')) {
+
+            $bucketName = 'material_images';
+
+            $file = $request->file('image');
+            $fileName = 'material_' . time() . '.' . $file->getClientOriginalExtension();
+            $fileContent = file_get_contents($file);
+
+            $upload = Http::withHeaders([
+                'apikey'        => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
             ])
-            ->withBody(
-                $file->getContent(), 
-                $file->getMimeType()
-            )
-            ->post(env('SUPABASE_URL') . '/storage/v1/object/' . $bucketName . '/' . $fileName);
+            ->attach('file', $fileContent, $fileName)
+            ->post($this->supabaseStorage . "/{$bucketName}/{$fileName}");
 
-            if ($uploadResponse->successful()) {
-                $thumbnailUrl = env('SUPABASE_URL') . '/storage/v1/object/public/' . $bucketName . '/' . $fileName;
-            } else {
-                \Log::error('Failed to upload material image', [
-                    'response' => $uploadResponse->body(),
-                    'status' => $uploadResponse->status(),
-                ]);
-                return back()->with('error', 'Failed to upload image: ' . $uploadResponse->body());
+            if ($upload->failed()) {
+                return dd($upload->json());
             }
+
+            // URL public
+            $imageUrl = $this->supabaseStorage . "/{$bucketName}/{$fileName}";
         }
 
-        // Insert material via GraphQL
-        $mutation = <<<'GRAPHQL'
-        mutation InsertMaterial($tittle: String!, $description: String!, $uploaded_by: BigInt!, $thumbnail_url: String, $file_url: String) {
+
+        /* ================================
+        UPLOAD FILE (material_files)
+        ================================= */
+        if ($request->hasFile('file')) {
+
+            $bucketName = 'material_files';
+
+            $file = $request->file('file');
+            $fileName = 'file_' . time() . '.' . $file->getClientOriginalExtension();
+            $fileContent = file_get_contents($file);
+
+            $upload = Http::withHeaders([
+                'apikey'        => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
+            ])
+            ->attach('file', $fileContent, $fileName)
+            ->post($this->supabaseStorage . "/{$bucketName}/{$fileName}");
+
+            if ($upload->failed()) {
+                return dd($upload->json());
+            }
+
+            $fileUrl = $this->supabaseStorage . "/{$bucketName}/{$fileName}";
+        }
+
+
+        /* ================================
+        INSERT MATERIAL VIA GRAPHQL
+        ================================= */
+        $query = <<<'GRAPHQL'
+        mutation InsertMaterial(
+            $tittle: String!,
+            $description: String!,
+            $file: String,
+            $image: String,
+            $uploaded_by: BigInt!
+        ) {
             insertIntomaterialsCollection(
                 objects: {
                     tittle: $tittle,
                     description: $description,
                     uploaded_by: $uploaded_by,
-                    thumbnail_url: $thumbnail_url,
-                    file_url: $file_url
+                    file_url: $file,
+                    thumbnail_url: $image,
+                    status: "pending"
                 }
             ) {
                 affectedCount
                 records {
                     material_id
-                    tittle
                 }
             }
         }
         GRAPHQL;
 
-        // file_url is NOT NULL in database, so use thumbnail or empty string
-        $fileUrl = $thumbnailUrl ?: '';
-
-        // If file_url is empty string, we need to handle it differently
-        // Check if database actually allows empty string for file_url
-        if (empty($fileUrl)) {
-            $fileUrl = 'https://via.placeholder.com/1x1?text=';
-        }
-
         $response = Http::withHeaders([
-            'apikey' => env('SUPABASE_SERVICE_KEY'),
-            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
-            'Content-Type' => 'application/json',
-        ])->post(env('SUPABASE_URL') . '/graphql/v1', [
-            'query' => $mutation,
+            'apikey' => $this->supabaseKey,
+            'Authorization' => 'Bearer ' . $this->supabaseKey,
+            'Content-Type' => 'application/json'
+        ])
+        ->post($this->supabaseUrl, [
+            'query' => $query,
             'variables' => [
-                'tittle' => $request->title,
-                'description' => $request->description,
-                'uploaded_by' => (int)$userId,
-                'thumbnail_url' => $thumbnailUrl,
-                'file_url' => $fileUrl,
-            ],
+                'tittle'       => $request->tittle,
+                'description'  => $request->description ?? '',
+                'file'         => $fileUrl,
+                'image'        => $imageUrl,
+                'uploaded_by'  => (int)$userId,
+            ]
         ]);
 
         if ($response->failed() || isset($response->json()['errors'])) {
-            \Log::error('Material creation failed', [
-                'response' => $response->body(),
-                'status' => $response->status(),
-            ]);
-            return back()->with('error', 'Failed to create material: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'));
+            return back()->with(
+                'error',
+                'Failed to create material: ' .
+                ($response->json()['errors'][0]['message'] ?? 'Unknown error')
+            );
         }
 
-        return redirect()->route('materi.index')->with('success', 'Material published successfully!');
+        return back()->with('success', 'Materi berhasil diajukan, menunggu acc admin!');
     }
+
 
     public function destroy($material_id)
     {
