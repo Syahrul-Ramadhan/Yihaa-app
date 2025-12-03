@@ -116,6 +116,9 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
+
+        $email = $request->input('email');
+        $password = $request->input('password');
         $email = $request->input('email');
         $password = $request->input('password');
 
@@ -139,8 +142,8 @@ class AuthController extends Controller
 
         // Kirim request ke Supabase GraphQL API
         $response = Http::withHeaders([
-            'apikey' => env('SUPABASE_ANON_KEY'),
-            'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+            'apikey' => env('SUPABASE_SERVICE_ROLE_KEY'), // <--- Ganti ini
+            'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_ROLE_KEY'), // <--- Dan ini
             'Content-Type' => 'application/json',
         ])->post(env('SUPABASE_URL') . '/graphql/v1', [
             'query' => $query,
@@ -151,19 +154,31 @@ class AuthController extends Controller
 
         // Cek jika gagal
         if ($response->failed()) {
+            if ($request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => 'Gagal terhubung ke server Supabase.'], 500);
+            }
             return back()->with('error', 'Gagal terhubung ke server Supabase.');
         }
-
+// 1. Ambil data dari response Supabase
         $edges = $response->json('data.usersCollection.edges') ?? [];
 
+        // 2. Cek apakah user ditemukan
         if (empty($edges)) {
+            // Jika request dari Katalon/API, kirim JSON
+            if ($request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => 'Email tidak ditemukan.'], 404);
+            }
+            // Jika dari browser biasa, kembali ke halaman login
             return back()->with('error', 'Email tidak ditemukan.');
         }
-
+        // -------------------------
         $user = $edges[0]['node'];
 
         // Cek password (karena disimpan plain di Supabase)
-        if (!Hash::check($password, $user['password'])) {
+       if (!Hash::check($password, $user['password'])) {
+            if ($request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => 'Password salah.'], 401);
+            }
             return back()->with('error', 'Password salah.');
         }
 
@@ -182,9 +197,37 @@ class AuthController extends Controller
         DB::table('sessions')
             ->where('id', session()->getId())
             ->update(['user_id' => $user['id']]);
-  
+
 
         // Redirect to loading screen instead of showing modal
+        // Regenerate session untuk keamanan
+        $request->session()->regenerate();
+
+        // Simpan data user di session
+        session([
+            'user_id' => $user['id'],
+            'user_name' => $user['name'],
+            'user_email' => $user['email'],
+            'user_role' => $user['role'],
+            'avatar_url' => $user['avatar_url'],
+        ]);
+
+        // Update user_id di tabel sessions
+        DB::table('sessions')
+            ->where('id', session()->getId())
+            ->update(['user_id' => $user['id']]);
+
+        // --- BAGIAN BARU UNTUK KATALON ---
+        if ($request->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Login berhasil!',
+                'data' => $user,
+            ], 200);
+        }
+        // ---------------------------------
+
+        // Redirect untuk pengunjung website biasa
         return redirect()->route('login.loading');
     }
 
