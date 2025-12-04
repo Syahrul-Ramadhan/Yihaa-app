@@ -14,7 +14,7 @@ class RecommendationService
         // URL layanan AI (FastAPI)
         // Jika running di Docker dan Laravel juga di Docker, gunakan nama service (e.g., http://yihaa-ai:8000)
         // Jika Laravel running di host (XAMPP/Local), gunakan http://localhost:8000
-        $this->aiServiceUrl = env('AI_SERVICE_URL', 'http://localhost:8000');
+        $this->aiServiceUrl = env('AI_SERVICE_URL', 'http://localhost:8001');
     }
 
     /**
