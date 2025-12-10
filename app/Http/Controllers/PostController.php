@@ -247,6 +247,13 @@ class PostController extends Controller
 
         $post->save(); // Model akan mengirim ini ke Supabase
 
+        // 6. Trigger AI Embedding (Real-time)
+        try {
+            $recommendationService = new \App\Services\RecommendationService();
+            $recommendationService->generateEmbedding($post->post_id, $post->caption);
+        } catch (\Exception $e) {
+            // Ignore error, don't block user
+        }
 
         // 5. Kembalikan ke halaman home
         return redirect()->route('posts.index')->with('success', 'Postingan berhasil ditambahkan!');

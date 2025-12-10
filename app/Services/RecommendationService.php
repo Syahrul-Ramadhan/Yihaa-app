@@ -48,4 +48,24 @@ class RecommendationService
 
         return [];
     }
+
+    /**
+     * Trigger AI to generate embedding for a new post.
+     *
+     * @param int $postId
+     * @param string $caption
+     * @return void
+     */
+    public function generateEmbedding(int $postId, string $caption)
+    {
+        try {
+            Http::timeout(5)->post("{$this->aiServiceUrl}/embed_post", [
+                'post_id' => $postId,
+                'caption' => $caption,
+            ]);
+        } catch (\Exception $e) {
+            // Log error but don't stop the app
+            Log::warning("AI Embedding Failed: " . $e->getMessage());
+        }
+    }
 }
