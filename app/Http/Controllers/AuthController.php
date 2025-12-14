@@ -91,11 +91,27 @@ class AuthController extends Controller
 
         $json = $response->json();
 
-        // 🔥 Tangani error dari Supabase (misal email duplikat)
-        if (isset($json['errors'][0]['message']) && str_contains(strtolower($json['errors'][0]['message']), 'duplicate')) {
-            return back()
-                ->withErrors(['email' => 'Email telah digunakan, silakan gunakan email lainnya.'])
-                ->withInput();
+        // 🔥 Tangani error dari Supabase (duplicate email/username)
+        if (isset($json['errors'][0]['message'])) {
+            $errorMsg = strtolower($json['errors'][0]['message']);
+
+            if (str_contains($errorMsg, 'email')) {
+                return back()
+                    ->withErrors(['email' => 'Email telah digunakan, silakan gunakan email lainnya.'])
+                    ->withInput();
+            }
+
+            if (str_contains($errorMsg, 'name')) {
+                return back()
+                    ->withErrors(['name' => 'Username telah digunakan, silakan pilih username lain.'])
+                    ->withInput();
+            }
+
+            if (str_contains($errorMsg, 'duplicate')) {
+                return back()
+                    ->withErrors(['general' => 'Data sudah ada.'])
+                    ->withInput();
+            }
         }
 
         // 5️⃣ Cek jika tidak ada error tapi affectedCount = 0
@@ -431,5 +447,90 @@ class AuthController extends Controller
         return redirect('/')->with('success', 'Password berhasil diubah!');
     }
 
+public function apiRegister(Request $request)
+{
+    // 1️⃣ Validasi input
+    $validator = Validator::make($request->all(), [
+        'name'     => 'required|string|max:100',
+        'email'    => 'required|email',
+        'password' => 'required|min:6',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Validasi gagal',
+            'errors' => $validator->errors()
+        ], 422);
+    }
+
+    // 2️⃣ GraphQL Mutation ke Supabase
+    $mutation = <<<'GRAPHQL'
+    mutation InsertUser($name: String!, $email: String!, $password: String!, $avatar_url: String!, $role: String!) {
+      insertIntousersCollection(
+        objects: {
+          name: $name,
+          email: $email,
+          password: $password,
+          avatar_url: $avatar_url,
+          role: $role
+        }
+      ) {
+        affectedCount
+        records {
+          id
+          name
+          email
+          role
+          created_at
+        }
+      }
+    }
+    GRAPHQL;
+
+    $response = Http::withHeaders([
+        'apikey' => env('SUPABASE_ANON_KEY'),
+        'Authorization' => 'Bearer ' . env('SUPABASE_ANON_KEY'),
+        'Content-Type' => 'application/json',
+    ])->post(env('SUPABASE_URL') . '/graphql/v1', [
+        'query' => $mutation,
+        'variables' => [
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'avatar_url' => 'https://qdfotopajdiuailyeprh.supabase.co/storage/v1/object/public/avatars/default-user.jpg',
+            'role' => 'user',
+        ],
+    ]);
+
+    $json = $response->json();
+
+    // 3️⃣ Tangani error Supabase
+    if (isset($json['errors'][0]['message'])) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $json['errors'][0]['message']
+        ], 400);
+    }
+
+    // 4️⃣ Ambil hasil insert
+    $result = $json['data']['insertIntousersCollection'] ?? null;
+
+    if (!$result || ($result['affectedCount'] ?? 0) == 0) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Gagal menambahkan user'
+        ], 500);
+    }
+
+    $user = $result['records'][0];
+
+    // 🟢 5️⃣ Response sukses
+    return response()->json([
+        'status' => 'success',
+        'message' => 'User berhasil dibuat',
+        'data' => $user
+    ], 201);
+}
 
 }
