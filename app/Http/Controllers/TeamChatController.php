@@ -4,16 +4,19 @@ use App\Helpers\SupabaseHelper;
 use App\Models\Post;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class TeamChatController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $userId = session('user_id');
 
         if (!$userId) {
             return redirect()->route('login')->with('error', 'Please login first');
         }
+
+        $search = $request->input('search');
 
         // Query teams yang user ikuti (accepted members only)
         $query = <<<GRAPHQL
@@ -50,6 +53,15 @@ class TeamChatController extends Controller
 
         $edges = $response->json('data.team_membersCollection.edges') ?? [];
         $teams = array_map(fn($edge) => $edge['node']['teams'], $edges);
+
+        if ($search) {
+            $teams = array_filter($teams, function ($team) use ($search) {
+                return str_contains(
+                    strtolower($team['team_name']),
+                    strtolower($search)
+                );
+            });
+        }
 
         return view('pages.users.messages', [
             'teams' => $teams,
@@ -154,7 +166,7 @@ class TeamChatController extends Controller
 
         // Debug jika perlu
         if ($messagesResponse->failed()) {
-            \Log::error('Chat messages query failed', [
+            Log::error('Chat messages query failed', [
                 'response' => $messagesResponse->body(),
                 'team_id' => $team_id
             ]);

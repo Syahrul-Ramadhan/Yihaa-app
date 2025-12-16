@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use App\Models\Team;
 
 class TeamController extends Controller
@@ -117,7 +118,7 @@ class TeamController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'team_name' => 'required|string|max:100',
+            'team_name' => 'required|string|max:18',
             'team_desc' => 'nullable|string',
             'member_limit' => 'required|integer|min:2|max:50',
             'team_logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
@@ -153,14 +154,14 @@ class TeamController extends Controller
                 if ($uploadResponse->successful()) {
                     $teamLogoUrl = env('SUPABASE_URL') . '/storage/v1/object/public/' . $bucketName . '/' . $fileName;
                 } else {
-                    \Log::warning('Failed to upload team logo, creating team without logo', [
+                    Log::warning('Failed to upload team logo, creating team without logo', [
                         'response' => $uploadResponse->body(),
                         'status' => $uploadResponse->status(),
                     ]);
                     // Continue without logo instead of failing
                 }
             } catch (\Exception $e) {
-                \Log::warning('Team logo upload timeout or error, creating team without logo', [
+                Log::warning('Team logo upload timeout or error, creating team without logo', [
                     'error' => $e->getMessage(),
                 ]);
                 // Continue without logo instead of failing
@@ -705,7 +706,7 @@ class TeamController extends Controller
                         ->delete(env('SUPABASE_URL') . '/storage/v1/object/post-images/' . $fileName);
                 }
             } catch (\Exception $e) {
-                \Log::warning('Failed to delete team logo', ['error' => $e->getMessage()]);
+                Log::warning('Failed to delete team logo', ['error' => $e->getMessage()]);
             }
         }
 
@@ -746,7 +747,7 @@ class TeamController extends Controller
         ]);
 
         if ($response->failed() || isset($response->json()['errors'])) {
-            \Log::error('Failed to delete team', [
+            Log::error('Failed to delete team', [
                 'response' => $response->body(),
                 'errors' => $response->json()['errors'] ?? null,
             ]);

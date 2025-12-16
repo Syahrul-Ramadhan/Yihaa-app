@@ -54,6 +54,9 @@ class EventController extends Controller
             'Content-Type' => 'application/json',
         ])->post(env('SUPABASE_URL') . '/graphql/v1', [
             'query' => $query,
+            'variables' => [
+                'filter' => $filter
+            ]
         ]);
 
         if ($response->failed()) {
@@ -115,6 +118,9 @@ class EventController extends Controller
             'Content-Type' => 'application/json',
         ])->post(env('SUPABASE_URL') . '/graphql/v1', [
             'query' => $query,
+            'variables' => [
+                'filter' => $filter
+            ]
         ]);
 
         if ($response->failed()) {
@@ -140,7 +146,7 @@ class EventController extends Controller
 
         if ($search) {
             $filter = [
-                'nama_beasiswa' => [ 'ilike' => '%' . $search . '%' ]
+                'nama_lomba' => [ 'ilike' => '%' . $search . '%' ]
             ];
         }
         
@@ -176,6 +182,9 @@ class EventController extends Controller
             'Content-Type' => 'application/json',
         ])->post(env('SUPABASE_URL') . '/graphql/v1', [
             'query' => $query,
+            'variables' => [
+                'filter' => $filter
+            ]
         ]);
 
         if ($response->failed()) {
