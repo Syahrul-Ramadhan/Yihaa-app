@@ -1,104 +1,150 @@
 @extends('components._layouts.auth')
 @section('content')
+@extends('components._layouts.auth')
+@section('content')
 <div class="flex items-center md:h-auto min-h-screen overflow-hidden">
     <div
-        class="bg-white w-full min-h-screen md:min-h-0 rounded-t-2xl md:rounded-2xl md:mx-auto mt-12 px-6 py-10 md:w-1/3 md:mt-0">
+        class="bg-white w-full min-h-screen md:min-h-0 rounded-t-2xl md:rounded-2xl md:mx-auto mt-20 px-8 py-10 md:w-[450px] shadow-lg">
         <div class="text-gray-800 lg:text-center mb-6">
             <p class="font-bold text-2xl">Forgot your password?</p>
-            <p class="text-sm text-gray-600">Enter your email and we'll send you a reset link.</p>
+            <p class="text-sm text-gray-600 mt-2">Enter your email and we'll send you a reset link.</p>
         </div>
-        <form class="space-y-6 w-full max-w-sm " id="resetForm">
+        <form class="space-y-6 w-full" id="resetForm">
             @csrf
             <div class="space-y-6 mb-6">
-                <div class="relative">
-                    <input type="email" id="email" name="email" class="peer p-4 block w-full border border-gray-300 rounded-lg sm:text-sm placeholder:text-transparent focus:border-[#27D5E8] focus:ring-[#27D5E8] disabled:opacity-50 disabled:pointer-events-none
-                    focus:pt-6
-                    focus:pb-2
-                    not-placeholder-shown:pt-6
-                    not-placeholder-shown:pb-2
-                    autofill:pt-6
-                    autofill:pb-2" placeholder="you@email.com">
-                    @if ($errors->has('email'))
-                    <span class="mt-1 text-sm text-red-500 block">
-                        {{ $errors->first('email') }}
-                    </span>
-                    @endif
-
-                    <label for="email"
-                        class="absolute top-0 start-0 p-4 h-full sm:text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent origin-[0_0] peer-disabled:opacity-50 peer-disabled:pointer-events-none
-                      peer-focus:scale-90
-                      peer-focus:translate-x-0.5
-                      peer-focus:-translate-y-1.5
-                      peer-focus:text-gray-500 dark:peer-focus:text-neutral-500
-                      peer-not-placeholder-shown:scale-90
-                      peer-not-placeholder-shown:translate-x-0.5
-                      peer-not-placeholder-shown:-translate-y-1.5
-                      peer-not-placeholder-shown:text-gray-500 dark:peer-not-placeholder-shown:text-neutral-500 dark:text-neutral-500">Email</label>
-                </div>
+                <x-_ui.emailInput />
             </div>
             <button type="submit"
-                class="w-full py-3 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-[#0D1517] text-white hover:bg-[#182427] focus:outline-hidden cursor-pointer disabled:opacity-50">Send
-                reset link</button>
-            <p class="text-center text-sm text-gray-600 mt-4"><a href="/" class="text-[#27D5E8] underline">Back to
+                class="w-full py-3 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-[#0D1517] text-white hover:bg-[#182427] focus:outline-hidden cursor-pointer disabled:opacity-50 transition-all">
+                Send reset link
+            </button>
+            <p class="text-center text-sm text-gray-600 mt-4"><a href="/" class="text-[#27D5E8] underline hover:text-[#198b97]">Back to
                     login</a></p>
         </form>
     </div>
 </div>
 
-@if(session('success'))
-<script>
-showModal("Berhasil!", "{{ session('success') }}");
-</script>
-@endif
+<!-- Success Modal -->
+<div id="successModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl p-6 text-center w-80 shadow-xl transform transition-all scale-100">
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+            <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+        </div>
+        <h2 class="font-bold text-lg text-gray-800">Check Your Email</h2>
+        <p class="text-gray-600 mt-2 text-sm" id="successMessage">Link reset password has been sent.</p>
+        <div class="mt-6">
+            <button id="closeSuccessModal"
+                class="px-4 py-2.5 bg-gray-900 text-white hover:bg-gray-800 rounded-lg w-full font-medium transition-colors">
+                Okay
+            </button>
+        </div>
+    </div>
+</div>
 
-@if(session('error'))
-<script>
-showModal("Gagal!", "{{ session('error') }}");
-</script>
-@endif
+<!-- Error Modal -->
+<div id="errorModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl p-6 text-center w-80 shadow-xl">
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+            <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </div>
+        <h2 class="font-bold text-lg text-gray-800">Failed</h2>
+        <p class="text-gray-600 mt-2 text-sm" id="errorMessage">Something went wrong.</p>
+        <div class="mt-6">
+            <button id="closeErrorModal"
+                class="px-4 py-2.5 bg-gray-900 text-white hover:bg-gray-800 rounded-lg w-full font-medium transition-colors">
+                Try Again
+            </button>
+        </div>
+    </div>
+</div>
 
 <script type="module">
-import {
-    createClient
-} from 'https://esm.sh/@supabase/supabase-js';
+    import {
+        createClient
+    } from 'https://esm.sh/@supabase/supabase-js';
 
-document.addEventListener("DOMContentLoaded", () => {
-    const supabase = createClient(
-        "{{ env('SUPABASE_URL') }}",
-        "{{ env('SUPABASE_ANON_KEY') }}"
-    );
+    document.addEventListener("DOMContentLoaded", () => {
+        const supabase = createClient(
+            "{{ env('SUPABASE_URL') }}",
+            "{{ env('SUPABASE_ANON_KEY') }}"
+        );
 
-    const form = document.getElementById("resetForm");
-    const emailInput = document.getElementById("email");
-
-    if (!form || !emailInput) {
-        console.error("Form atau input email tidak ditemukan");
-        return;
-    }
-
-    form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-
-        const email = emailInput.value.trim();
-        if (!email) {
-            showModal("Gagal", "Email wajib diisi");
-            return;
+        const form = document.getElementById("resetForm");
+        // Check for email input by ID first, if not found try name attribute
+        let emailInput = document.getElementById("email");
+        if (!emailInput) {
+             emailInput = document.querySelector('input[name="email"]');
         }
 
-        const {
-            error
-        } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: "{{ url('/') }}"
-        });
+        const successModal = document.getElementById('successModal');
+        const errorModal = document.getElementById('errorModal');
+        const successMessage = document.getElementById('successMessage');
+        const errorMessage = document.getElementById('errorMessage');
 
-        if (error) {
-            showModal("Gagal", error.message);
-        } else {
-            showModal("Berhasil", "Link reset password telah dikirim ke email.");
-            form.reset();
+        // Modal Handlers
+        function showSuccess(msg) {
+            successMessage.textContent = msg;
+            successModal.classList.remove('hidden');
+        }
+
+        function showError(msg) {
+            errorMessage.textContent = msg;
+            errorModal.classList.remove('hidden');
+        }
+
+        if (document.getElementById('closeSuccessModal')) {
+            document.getElementById('closeSuccessModal').addEventListener('click', () => {
+                successModal.classList.add('hidden');
+                form.reset();
+            });
+        }
+
+        if (document.getElementById('closeErrorModal')) {
+            document.getElementById('closeErrorModal').addEventListener('click', () => {
+                errorModal.classList.add('hidden');
+            });
+        }
+
+        if (form) {
+            form.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                
+                // Re-query input in case x-ui component renders it differently
+                if (!emailInput) emailInput = document.querySelector('input[name="email"]');
+
+                const email = emailInput ? emailInput.value.trim() : '';
+
+                if (!email) {
+                    showError("Email wajib diisi");
+                    return;
+                }
+
+                const btn = form.querySelector('button[type="submit"]');
+                const originalText = btn.innerText;
+                btn.disabled = true;
+                btn.innerText = "Sending...";
+
+                try {
+                    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                        redirectTo: "{{ url('/reset-password') }}"
+                    });
+
+                    if (error) throw error;
+                    
+                    showSuccess("Link reset password telah dikirim ke email Anda.");
+                } catch (err) {
+                    showError(err.message || "Gagal mengirim link reset.");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                }
+            });
         }
     });
-});
 </script>
 
 @endsection
