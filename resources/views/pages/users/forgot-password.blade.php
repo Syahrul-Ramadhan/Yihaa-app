@@ -25,7 +25,7 @@
 </div>
 
 <!-- Success Modal -->
-<div id="successModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+<div id="successModal" class="hidden fixed inset-0 bg-black/60 items-center justify-center z-50">
     <div class="bg-white rounded-xl p-6 text-center w-80 shadow-xl transform transition-all scale-100">
         <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
             <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -44,7 +44,7 @@
 </div>
 
 <!-- Error Modal -->
-<div id="errorModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+<div id="errorModal" class="hidden fixed inset-0 bg-black/60 items-center justify-center z-50">
     <div class="bg-white rounded-xl p-6 text-center w-80 shadow-xl">
         <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
             <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -89,16 +89,19 @@
         function showSuccess(msg) {
             successMessage.textContent = msg;
             successModal.classList.remove('hidden');
+            successModal.classList.add('flex');
         }
 
         function showError(msg) {
             errorMessage.textContent = msg;
             errorModal.classList.remove('hidden');
+            errorModal.classList.add('flex');
         }
 
         if (document.getElementById('closeSuccessModal')) {
             document.getElementById('closeSuccessModal').addEventListener('click', () => {
                 successModal.classList.add('hidden');
+                successModal.classList.remove('flex');
                 form.reset();
             });
         }
@@ -106,6 +109,7 @@
         if (document.getElementById('closeErrorModal')) {
             document.getElementById('closeErrorModal').addEventListener('click', () => {
                 errorModal.classList.add('hidden');
+                errorModal.classList.remove('flex');
             });
         }
 
