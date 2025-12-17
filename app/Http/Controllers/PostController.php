@@ -29,100 +29,137 @@ class PostController extends Controller
         if ($userId) {
             try {
                 $recommendationService = new \App\Services\RecommendationService();
-                $recommendedPostIds = $recommendationService->getRecommendations($userId, 20);
+                $recommendedPostIds = $recommendationService->getRecommendations($userId, 50); // Increase limit to 50
             } catch (\Exception $e) {
-                // Fallback silently if AI fails
+                // Fallback silently
                 \Illuminate\Support\Facades\Log::error("Recommendation failed: " . $e->getMessage());
             }
         }
 
-        // 2. Build GraphQL Query
-        // If we have recommendations, we filter by those IDs
-        // Otherwise, we show latest posts (default behavior)
+        // 2. Build GraphQL Queries (Dual Query Strategy)
+        // Query A: Recommended Posts
+        // Query B: General/Latest Posts (to fill the feed)
 
-        $filterQuery = '';
+        $recFilterStr = "";
         if (!empty($recommendedPostIds)) {
-            // GraphQL filter: { post_id: { in: [1, 2, 3] } }
             $idsString = implode(',', $recommendedPostIds);
-            $filterQuery = ", filter: { post_id: { in: [$idsString] } }";
-
-            // Note: GraphQL doesn't support custom ordering by specific ID list easily without client-side sorting.
-            // For now, we fetch them and will sort them in PHP to match recommendation order.
-        } elseif ($search) {
-            $filterQuery = ', filter: { caption: { ilike: "%' . $search . '%" } }';
+            $recFilterStr = ", filter: { post_id: { in: [$idsString] } }";
         }
 
-        $query = <<<GRAPHQL
-        query {
-            postsCollection(
-                orderBy: [{ created_at: DescNullsLast }]
-                $filterQuery
-            ) {
-                edges {
-                    node {
-                        post_id
-                        caption
-                        image_url
-                        created_at
-                        uploaded_by
-                        users {
-                            name
-                            avatar_url
-                        }
-                    }
-                }
-            }
-
-            likes: likesCollection {
-                edges {
-                    node {
-                        like_id
-                        post_id
-                        user_id
-                    }
-                }
-            }
-
-            comments: commentsCollection {
-                edges {
-                    node {
-                        comment_id
-                        post_id
-                        comment_text
-                        parent_comment_id
-                        user_id
-                        users {
-                            name
-                            avatar_url
-                        }
-                    }
-                }
-            }
+        // General Filter (Search or None)
+        $generalFilterStr = "";
+        if ($search) {
+            $generalFilterStr = ', filter: { caption: { ilike: "%' . $search . '%" } }';
         }
+
+        // We run ONE big query with aliases to get both sets if needed, or just standard query if searching
+        // If searching, ignore recommendations logic and just search.
+
+        $queryBody = <<<GRAPHQL
+            edges {
+                node {
+                    post_id
+                    caption
+                    image_url
+                    created_at
+                    uploaded_by
+                    users {
+                        name
+                        avatar_url
+                    }
+                }
+            }
         GRAPHQL;
 
-        $url = rtrim(env('SUPABASE_URL'), '/');
+        if ($search) {
+            // SEARCH MODE: Simple single query
+            $finalQuery = <<<GRAPHQL
+            query {
+                postsCollection(orderBy: [{ created_at: DescNullsLast }] $generalFilterStr, first: 50) {
+                    $queryBody
+                }
+                likes: likesCollection {
+                    edges { node { like_id post_id user_id } }
+                }
+                comments: commentsCollection {
+                    edges { node { comment_id post_id comment_text parent_comment_id user_id users { name avatar_url } } }
+                }
+            }
+            GRAPHQL;
+        } else {
+            // FEED MODE: Hybrid (Recs + Latest)
+            // Query Recs (if any) and Latest (up to 50)
 
+            $recSection = "";
+            if (!empty($recFilterStr)) {
+                $recSection = "recs: postsCollection(orderBy: [{ created_at: DescNullsLast }] $recFilterStr) { $queryBody }";
+            }
+
+            $finalQuery = <<<GRAPHQL
+            query {
+                $recSection
+                latest: postsCollection(orderBy: [{ created_at: DescNullsLast }], first: 200) {
+                    $queryBody
+                }
+                likes: likesCollection {
+                    edges { node { like_id post_id user_id } }
+                }
+                comments: commentsCollection {
+                    edges { node { comment_id post_id comment_text parent_comment_id user_id users { name avatar_url } } }
+                }
+            }
+            GRAPHQL;
+        }
+
+        $url = rtrim(env('SUPABASE_URL'), '/');
         $response = Http::withHeaders([
             'apikey' => env('SUPABASE_SERVICE_KEY'),
             'Authorization' => 'Bearer ' . env('SUPABASE_SERVICE_KEY'),
             'Content-Type' => 'application/json',
         ])->post($url . '/graphql/v1', [
-            'query' => $query
+            'query' => $finalQuery
         ]);
 
         if ($response->failed()) {
             dd('Error HTTP: ' . $response->body());
         }
-
         if ($response->json('errors')) {
             dd('GraphQL Error: ', $response->json('errors'));
         }
 
         $data = $response->json('data');
+
         $userId = session('user_id');
         if (!$userId) {
             return back()->with('error', 'Please login first');
+        }
+
+        // Merge Logic
+        $allEdges = [];
+
+        if ($search) {
+            $allEdges = $data['postsCollection']['edges'] ?? [];
+        } else {
+            // Combine Recs and Latest
+            $recEdges = $data['recs']['edges'] ?? [];
+            $latestEdges = $data['latest']['edges'] ?? [];
+
+            // Map by ID to deduplicate
+            $merged = [];
+
+            // Add Recs first (Priority)
+            foreach ($recEdges as $edge) {
+                $merged[$edge['node']['post_id']] = $edge;
+            }
+
+            // Add Latest (Fill)
+            foreach ($latestEdges as $edge) {
+                if (!isset($merged[$edge['node']['post_id']])) {
+                    $merged[$edge['node']['post_id']] = $edge;
+                }
+            }
+
+            $allEdges = array_values($merged);
         }
 
         // ================================
@@ -143,7 +180,7 @@ class PostController extends Controller
         // ================================
         // MAP POSTS
         // ================================
-        $posts = collect($data['postsCollection']['edges'])->map(function ($edge) use ($likesGrouped, $commentsGrouped, $likesIndexed, $userId) {
+        $posts = collect($allEdges)->map(function ($edge) use ($likesGrouped, $commentsGrouped, $likesIndexed, $userId) {
             $post = $edge['node'];
             $id = $post['post_id'];
 
