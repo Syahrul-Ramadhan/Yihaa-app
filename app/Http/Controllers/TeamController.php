@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use App\Models\Team;
 
 class TeamController extends Controller
@@ -117,7 +118,7 @@ class TeamController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'team_name' => 'required|string|max:100',
+            'team_name' => 'required|string|max:18',
             'team_desc' => 'nullable|string',
             'member_limit' => 'required|integer|min:2|max:50',
             'team_logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
@@ -153,14 +154,14 @@ class TeamController extends Controller
                 if ($uploadResponse->successful()) {
                     $teamLogoUrl = env('SUPABASE_URL') . '/storage/v1/object/public/' . $bucketName . '/' . $fileName;
                 } else {
-                    \Log::warning('Failed to upload team logo, creating team without logo', [
+                    Log::warning('Failed to upload team logo, creating team without logo', [
                         'response' => $uploadResponse->body(),
                         'status' => $uploadResponse->status(),
                     ]);
                     // Continue without logo instead of failing
                 }
             } catch (\Exception $e) {
-                \Log::warning('Team logo upload timeout or error, creating team without logo', [
+                Log::warning('Team logo upload timeout or error, creating team without logo', [
                     'error' => $e->getMessage(),
                 ]);
                 // Continue without logo instead of failing
@@ -206,12 +207,19 @@ class TeamController extends Controller
         ]);
 
         if ($response->failed() || isset($response->json()['errors'])) {
-            \Log::error('Failed to create team', [
-                'response' => $response->body(),
-                'status' => $response->status(),
-                'errors' => $response->json()['errors'] ?? null,
-            ]);
-            return back()->with('error', 'Failed to create team: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'));
+            $errorMessage = strtolower($response->json()['errors'][0]['message'] ?? '');
+
+            // ❌ Nama terlalu panjang (melebihi limit kolom database)
+            if (str_contains($errorMessage, 'value too long')) {
+                return back()
+                    ->withErrors(['team_name' => 'Nama tim terlalu panjang, maksimal 100 karakter.'])
+                    ->withInput();
+            }
+
+            // ❌ Error lain (fallback)
+            return back()
+                ->with('error', 'Gagal membuat tim: ' . ($response->json()['errors'][0]['message'] ?? 'Unknown error'))
+                ->withInput();
         }
 
         // Get the created team_id from response
@@ -698,7 +706,7 @@ class TeamController extends Controller
                         ->delete(env('SUPABASE_URL') . '/storage/v1/object/post-images/' . $fileName);
                 }
             } catch (\Exception $e) {
-                \Log::warning('Failed to delete team logo', ['error' => $e->getMessage()]);
+                Log::warning('Failed to delete team logo', ['error' => $e->getMessage()]);
             }
         }
 
@@ -739,7 +747,7 @@ class TeamController extends Controller
         ]);
 
         if ($response->failed() || isset($response->json()['errors'])) {
-            \Log::error('Failed to delete team', [
+            Log::error('Failed to delete team', [
                 'response' => $response->body(),
                 'errors' => $response->json()['errors'] ?? null,
             ]);
@@ -1203,4 +1211,154 @@ class TeamController extends Controller
     //     return view('pages.users.team');
     // }
  
+    public function apiStoreTeam(Request $request)
+    {
+        $request->validate([
+            'team_name'     => 'required|string|max:100',
+            'team_desc'     => 'nullable|string',
+            'team_logo'     => 'nullable|string',
+            'leader_id'     => 'required|integer',
+            'member_limit'  => 'required|integer|min:2|max:50',
+        ]);
+
+        $data = [
+            'team_name'    => $request->team_name,
+            'team_desc'    => $request->team_desc,
+            'team_logo'    => $request->team_logo,
+            'leader_id'    => (int)$request->leader_id,
+            'member_limit' => (int)$request->member_limit,
+        ];
+
+        $query = <<<GRAPHQL
+        mutation InsertTeam(
+            \$team_name: String!,
+            \$team_desc: String,
+            \$team_logo: String,
+            \$leader_id: BigInt!,
+            \$member_limit: Int!
+        ) {
+            insertIntoteamsCollection(
+                objects: {
+                    team_name: \$team_name,
+                    team_desc: \$team_desc,
+                    team_logo: \$team_logo,
+                    leader_id: \$leader_id,
+                    member_count: 1,
+                    member_limit: \$member_limit,
+                    team_status: "open"
+                }
+            ) {
+                records {
+                    team_id
+                    team_name
+                }
+            }
+        }
+        GRAPHQL;
+
+        $response = Http::withHeaders([
+            'apikey' => $this->supabaseKey,
+            'Authorization' => 'Bearer ' . $this->supabaseKey,
+        ])->post($this->supabaseUrl, [
+            'query'     => $query,
+            'variables' => $data
+        ]);
+
+        $json = $response->json();
+
+        if (!isset($json['data']['insertIntoteamsCollection']['records'][0])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal membuat tim',
+                'raw' => $json
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Team berhasil dibuat!',
+            'data'    => $json['data']['insertIntoteamsCollection']['records'][0]
+        ], 201);
+    }
+
+    public function apiUpdateTeam(Request $request, $id)
+    {
+        $request->validate([
+            'team_name'     => 'required|string|max:100',
+            'team_desc'     => 'nullable|string',
+            'team_logo'     => 'nullable|string',
+            'member_limit'  => 'required|integer|min:2|max:50',
+        ]);
+
+        $data = [
+            'team_id'      => (int)$id,
+            'team_name'    => $request->team_name,
+            'team_desc'    => $request->team_desc,
+            'team_logo'    => $request->team_logo,
+            'member_limit' => (int)$request->member_limit
+        ];
+
+        $query = <<<GRAPHQL
+        mutation UpdateTeam(
+            \$team_id: BigInt!,
+            \$team_name: String,
+            \$team_desc: String,
+            \$team_logo: String,
+            \$member_limit: Int
+        ) {
+            updateteamsCollection(
+                filter: {team_id: {eq: \$team_id}},
+                set: {
+                    team_name: \$team_name,
+                    team_desc: \$team_desc,
+                    team_logo: \$team_logo,
+                    member_limit: \$member_limit
+                }
+            ) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        $response = Http::withHeaders([
+            'apikey' => $this->supabaseKey,
+            'Authorization' => 'Bearer ' . $this->supabaseKey,
+        ])->post($this->supabaseUrl, [
+            'query'     => $query,
+            'variables' => $data
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Team berhasil diperbarui!',
+            'response' => $response->json()
+        ], 200);
+    }
+
+    public function apiDeleteTeam($id)
+    {
+        $query = <<<GRAPHQL
+        mutation DeleteTeam(\$team_id: BigInt!) {
+            deleteFromteamsCollection(
+                filter: {team_id: {eq: \$team_id}}
+            ) {
+                affectedCount
+            }
+        }
+        GRAPHQL;
+
+        $response = Http::withHeaders([
+            'apikey' => $this->supabaseKey,
+            'Authorization' => 'Bearer ' . $this->supabaseKey,
+        ])->post($this->supabaseUrl, [
+            'query'     => $query,
+            'variables' => ['team_id' => (int)$id]
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Team berhasil dihapus!',
+            'response' => $response->json()
+        ], 200);
+    }
 }

@@ -4,34 +4,55 @@
 <div class="flex h-screen bg-[#0E1419] text-white">
 
     {{-- SIDEBAR TIM --}}
-    <div x-data="{ showRef: false }" class="w-80 border-r border-gray-700 flex flex-col">
+    <div x-data="{ 
+        showRef: false,
+        keyword: '',
+        teams: @js($teams),
+        activeTeamId: {{ isset($activeTeam) ? (int)$activeTeam['team_id'] : 'null' }}
+    }" class="w-80 border-r border-gray-700 flex flex-col">
 
         {{-- Header Sidebar --}}
         <div class="flex items-center gap-3 p-4 border-b border-gray-700">
-            <button onclick="window.location.href='/home'" class="text-gray-400 hover:text-white cursor-pointer">
+            <button onclick="window.location.href='/home'" class="text-gray-400 hover:text-white">
                 <i class="hgi hgi-stroke hgi-arrow-left-02"></i>
             </button>
-            <input type="text" placeholder="Search team..."
-                class="bg-[#1A232B] text-sm px-3 py-2 rounded-md focus:outline-none w-full">
+
+            <input type="text" placeholder="Search team..." x-model="keyword"
+                class="bg-[#1A232B] text-sm px-3 py-2 rounded-md w-full focus:outline-none" />
+
+            {{-- Reset Search --}}
+            <button x-show="keyword.length" @click="keyword = ''" class="text-gray-400 hover:text-white">
+                <i class="hgi hgi-stroke hgi-cancel-01 text-lg"></i>
+            </button>
         </div>
 
         {{-- Daftar Tim --}}
-        <div class="flex-1 overflow-y-auto">
-            @foreach ($teams as $team)
-            <a href="{{ route('chat.show', $team['team_id']) }}"
-                class="flex items-center gap-3 px-3 py-2 hover:bg-neutral-900 rounded 
-                          {{ isset($activeTeam) && $activeTeam['team_id'] === $team['team_id'] ? 'bg-neutral-800' : '' }}">
-                <div
-                    class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-sm font-bold overflow-hidden">
-                    @if(isset($team['team_logo']) && $team['team_logo'])
-                    <img src="{{ $team['team_logo'] }}" alt="team-logo" class="w-full h-full rounded-full object-cover">
-                    @else
-                    <i class="hgi hgi-stroke hgi-group text-sm text-[#2aa3ef]"></i>
-                    @endif
-                </div>
-                <span class="text-sm">{{ $team['team_name'] }}</span>
-            </a>
-            @endforeach
+        <div class="flex-1 overflow-y-auto space-y-1 px-1">
+            <template x-for="team in teams.filter(t => 
+                t.team_name.toLowerCase().includes(keyword.toLowerCase())
+            )" :key="team.team_id">
+                <a :href="`/chat/${team.team_id}`"
+                    class="flex items-center gap-3 px-3 py-2 rounded hover:bg-neutral-900"
+                    :class="{ 'bg-neutral-800': team.team_id === activeTeamId }">
+                    <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                        <template x-if="team.team_logo">
+                            <img :src="team.team_logo" alt="team-logo" class="w-full h-full rounded-full object-cover">
+                        </template>
+                        <template x-if="!team.team_logo">
+                            <i class="hgi hgi-stroke hgi-group text-sm text-[#2aa3ef]"></i>
+                        </template>
+                    </div>
+
+                    <span class="text-sm truncate" x-text="team.team_name"></span>
+                </a>
+            </template>
+
+            {{-- Jika hasil kosong --}}
+            <div x-show="teams.filter(t => 
+                t.team_name.toLowerCase().includes(keyword.toLowerCase())
+            ).length === 0" class="text-center text-gray-400 text-sm mt-4">
+                Team tidak ditemukan
+            </div>
         </div>
     </div>
 

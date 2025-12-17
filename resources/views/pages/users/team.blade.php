@@ -168,8 +168,18 @@
             <!-- Team Name -->
             <div>
                 <label class="block text-sm font-semibold text-gray-300 mb-2">Team Name</label>
-                <input type="text" name="team_name" required placeholder="Enter team name..."
-                    class="w-full bg-[#1A232B] border border-[#2aa3ef40] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#2aa3ef] focus:ring-2 focus:ring-[#2aa3ef20] transition">
+                <input type="text" name="team_name" value="{{ old('team_name') }}" required maxlength="18"
+                    placeholder="Enter team name..." class="w-full bg-[#1A232B] border 
+                @error('team_name') border-red-500 @else border-[#2aa3ef40] @enderror
+                rounded-lg px-4 py-3 text-white placeholder-gray-500
+                focus:outline-none focus:ring-2 transition
+                @error('team_name') focus:ring-red-500/30 @else focus:ring-[#2aa3ef20] @enderror">
+
+                @error('team_name')
+                <p class="mt-2 text-sm text-red-400">
+                    {{ $message }}
+                </p>
+                @enderror
             </div>
 
             <!-- Description -->
