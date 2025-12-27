@@ -14,7 +14,6 @@ YIHAA is a modern web platform designed to facilitate student collaboration, soc
 -   [User Guide](#user-guide)
 -   [Admin Guide](#admin-guide)
 -   [Troubleshooting](#troubleshooting)
--   [License](#license)
 
 ---
 
@@ -776,28 +775,12 @@ Contributions are greatly appreciated! Please:
 
 ---
 
-## 📄 License
-
-This project is licensed under the [MIT License](LICENSE) - See the LICENSE file for details.
-
----
-
 ## 👥 Development Team
 
 **YIHAA Development Team**
 
 -   Contributors: Development Team
 -   Last Updated: December 2025
-
----
-
-## 📞 Support & Feedback
-
-For questions, bug reports, or feedback:
-
--   Email: support@yihaa.com
--   Issue Tracker: [GitHub Issues](https://github.com/yourrepo/issues)
--   Documentation: [Wiki](https://github.com/yourrepo/wiki)
 
 ---
 
