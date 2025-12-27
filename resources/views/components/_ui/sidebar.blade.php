@@ -1,4 +1,4 @@
-    <div class="fixed h-screen flex flex-col justify-between transition-all duration-300 border-r-1 border-gray-600 scroll-auto"
+    <div class="h-screen fixed flex flex-col justify-between transition-all duration-300 border-r-1 border-gray-600 scroll-auto"
         :class="open ? 'w-64' : 'w-20'">
         <div class="flex flex-col gap-10">
             <!-- Logo -->
@@ -102,7 +102,8 @@
         <div class="relative" x-data="{ logoutOpen: false }">
             <div class="p-4 flex items-center space-x-3 border-t border-gray-700 cursor-pointer hover:bg-neutral-900 transition-all duration-200"
                 @click="logoutOpen = !logoutOpen">
-                <img src="{{ session('avatar_url') ?? 'https://qdfotopajdiuailyeprh.supabase.co/storage/v1/object/public/avatars/default-user.jpg' }}" class="w-10 h-10 rounded-full object-cover">
+                <img src="{{ session('avatar_url') ?? 'https://qdfotopajdiuailyeprh.supabase.co/storage/v1/object/public/avatars/default-user.jpg' }}"
+                    class="w-10 h-10 rounded-full object-cover">
                 <div x-show="open">
                     <p class="font-semibold">{{  session('user_name')}}</p>
                 </div>
